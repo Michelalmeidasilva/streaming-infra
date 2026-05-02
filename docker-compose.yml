@@ -1,0 +1,152 @@
+version: '3.8'
+
+services:
+  # MongoDB - Primary database for streaming events, metadata, and distribution
+  mongodb:
+    image: mongo:7
+    container_name: mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: >
+        mongosh --username admin --password password
+        --authenticationDatabase admin
+        --eval 'db.runCommand({ ping: 1 })' --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # RabbitMQ - Message broker for video processing pipeline
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"      # AMQP port
+      - "15672:15672"    # Management UI port (http://localhost:15672 - guest/guest)
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis - Cache layer for streaming distribution and real-time data
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: redis-cli ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes
+
+  # MinIO - S3-compatible object storage for video files and assets
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"      # MinIO S3 API port
+      - "9001:9001"      # MinIO Console port (http://localhost:9001 - admin/password123)
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password123
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: curl -f http://localhost:9000/minio/health/live
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: server /data --console-address ":9001"
+
+  # MinIO Setup - Creates initial buckets and configures webhooks
+  minio-setup:
+    image: minio/mc:latest
+    container_name: minio-setup
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Setting up MinIO client...';
+      /usr/bin/mc alias set local http://minio:9000 admin password123;
+      echo 'Creating videos bucket...';
+      /usr/bin/mc mb local/videos || true;
+      echo 'Applying MinIO CORS policy...';
+      printf '%s' '<CORSConfiguration><CORSRule><AllowedOrigin>*</AllowedOrigin><AllowedMethod>GET</AllowedMethod><AllowedMethod>PUT</AllowedMethod><AllowedMethod>POST</AllowedMethod><AllowedMethod>DELETE</AllowedMethod><AllowedMethod>HEAD</AllowedMethod><AllowedHeader>*</AllowedHeader><ExposeHeader>ETag</ExposeHeader><ExposeHeader>x-amz-request-id</ExposeHeader><MaxAgeSeconds>3600</MaxAgeSeconds></CORSRule></CORSConfiguration>' >/tmp/videos-cors.xml;
+      /usr/bin/mc cors set local/videos /tmp/videos-cors.xml;
+      echo 'MinIO setup completed!';
+      "
+
+  # Event Gateway - Ingests upload events and publishes to RabbitMQ
+  event-gateway:
+    build:
+      context: ../streaming-ingest
+      dockerfile: Dockerfile
+    container_name: event-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      MONGODB_URI: mongodb://admin:password@mongodb:27017/streaming?authSource=admin
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      SERVER_PORT: 8080
+      MINIO_ENDPOINT: localhost:9000
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password123
+    extra_hosts:
+      - "localhost:host-gateway"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - default
+
+  # Mongo Express - Web-based MongoDB management UI
+  mongo-express:
+    image: mongo-express:latest
+    container_name: mongo-express
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://admin:password@mongodb:27017/?authSource=admin
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: password
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: password
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+volumes:
+  mongodb_data:
+  rabbitmq_data:
+  redis_data:
+  minio_data:
+
+networks:
+  default:
+    name: vod-network
