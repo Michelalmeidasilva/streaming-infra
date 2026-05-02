@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../../streaming-ingest"
+		},
+		{
+			"path": "../../streaming-platform-upload"
+		},
+		{
+			"path": "../../docs"
+		}
+	]
+}
