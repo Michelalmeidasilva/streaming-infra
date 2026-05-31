@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # MongoDB - Primary database for streaming events, metadata, and distribution
   mongodb:
@@ -121,6 +119,41 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+    networks:
+      - default
+
+  # Streaming Transcode - Consumes upload completion events and creates HLS/DASH outputs
+  streaming-transcode:
+    build:
+      context: ../streaming-transcode
+      dockerfile: Dockerfile
+    container_name: streaming-transcode
+    restart: unless-stopped
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      STORAGE_PROVIDER: minio
+      STORAGE_BUCKET: videos
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: admin
+      MINIO_SECRET_KEY: password123
+      EVENT_GATEWAY_URL: http://event-gateway:8080/api/v1
+      TRANSCODE_WORKDIR: /tmp/transcode
+      TRANSCODE_PROFILE: production-h264-h265-hls-dash
+      TRANSCODE_CODECS: h264,h265
+      TRANSCODE_QUEUE: transcode.jobs
+      TRANSCODE_RETRY_QUEUE: transcode.retry
+      TRANSCODE_DEAD_QUEUE: transcode.dead
+      TRANSCODE_BINDING_KEY: video.upload.completed
+      TRANSCODE_MAX_ATTEMPTS: 3
+      TRANSCODE_RETRY_DELAY_SECONDS: 60
+      FFMPEG_PRESET: veryfast
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      event-gateway:
+        condition: service_started
     networks:
       - default
 

@@ -17,10 +17,10 @@ resource "aws_s3_bucket_cors_configuration" "this" {
   bucket = aws_s3_bucket.this.id
 
   cors_rule {
-    allowed_headers = ["*"]
+    allowed_headers = var.cors_allowed_headers
     allowed_methods = ["PUT", "POST", "GET", "HEAD"]
-    allowed_origins = ["*"] # In production, restrict to your specific domains e.g., ["https://yourdomain.com"]
-    expose_headers  = ["ETag"] # ETag is CRITICAL for the client to read when completing Multipart Uploads
+    allowed_origins = var.cors_allowed_origins
+    expose_headers  = var.cors_expose_headers # ETag is CRITICAL for the client to read when completing Multipart Uploads
     max_age_seconds = 3000
   }
 }
