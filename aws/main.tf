@@ -13,8 +13,9 @@ provider "aws" {
 
 # 1. Provision the S3 Bucket
 module "storage_s3" {
-  source      = "./modules/storage-s3"
-  bucket_name = "vod-streaming-storage-2026-meu-teste" # You can change this to a unique name
+  source               = "./modules/storage-s3"
+  bucket_name          = "vod-streaming-storage-2026-meu-teste" # You can change this to a unique name
+  cors_allowed_origins = ["http://localhost:3000"]
 }
 
 # 2. Provision the IAM User with least-privilege access to the bucket
