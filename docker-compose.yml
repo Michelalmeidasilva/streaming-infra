@@ -174,6 +174,22 @@ services:
     networks:
       - default
 
+  # Web Client - Consumer-facing PWA (SvelteKit + Shaka Player)
+  streaming-web-client:
+    build:
+      context: ../streaming-web-client
+      dockerfile: Dockerfile
+      args:
+        # PUBLIC_ vars são embutidos no build estático pelo SvelteKit
+        PUBLIC_DISTRIBUTION_URL: http://localhost:8082
+        PUBLIC_API_KEY: pk_dev
+    container_name: streaming-web-client
+    restart: unless-stopped
+    ports:
+      - "5173:80"    # http://localhost:5173
+    networks:
+      - default
+
   # Mongo Express - Web-based MongoDB management UI
   mongo-express:
     image: mongo-express:latest
