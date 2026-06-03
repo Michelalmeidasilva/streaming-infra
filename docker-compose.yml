@@ -255,23 +255,9 @@ services:
       mongodb:
         condition: service_healthy
 
-  # ── streaming-telemetry: Observability stack (OTEL + Prometheus/Loki/Tempo/Grafana) ──
+  # ── streaming-telemetry: Observability stack (Prometheus + Grafana + exporters) ──
 
-  # OTEL Collector - Central ingestion point for metrics, logs and traces (OTLP)
-  otelcol:
-    build:
-      context: ../streaming-telemetry/collector
-    container_name: otelcol
-    restart: unless-stopped
-    ports:
-      - "4317:4317"    # OTLP gRPC
-      - "4318:4318"    # OTLP HTTP
-      - "8888:8888"    # Collector self-metrics
-      - "8889:8889"    # Prometheus exporter
-    networks:
-      - default
-
-  # Prometheus - Metrics storage scraped from the OTEL Collector
+  # Prometheus - Metrics storage
   prometheus:
     image: prom/prometheus:v2.53.0
     container_name: prometheus
@@ -287,40 +273,11 @@ services:
       - --storage.tsdb.retention.time=15d
       - --web.enable-lifecycle
     depends_on:
-      - otelcol
+      - cadvisor
     networks:
       - default
 
-  # Loki - Log aggregation backend
-  loki:
-    image: grafana/loki:3.0.0
-    container_name: loki
-    restart: unless-stopped
-    ports:
-      - "3100:3100"
-    volumes:
-      - ../streaming-telemetry/collector/loki-config.yaml:/etc/loki/local-config.yaml:ro
-      - loki-data:/loki
-    command: -config.file=/etc/loki/local-config.yaml
-    networks:
-      - default
-
-  # Tempo - Distributed tracing backend
-  tempo:
-    image: grafana/tempo:2.5.0
-    container_name: tempo
-    restart: unless-stopped
-    ports:
-      - "3200:3200"
-      - "4319:4317"    # OTLP gRPC (remapped to avoid clash with otelcol:4317)
-    volumes:
-      - ../streaming-telemetry/collector/tempo-config.yaml:/etc/tempo.yaml:ro
-      - tempo-data:/var/tempo
-    command: -config.file=/etc/tempo.yaml
-    networks:
-      - default
-
-  # Grafana - Unified dashboards over Prometheus/Loki/Tempo (host :3000)
+  # Grafana - Unified dashboards over Prometheus (host :3000)
   grafana:
     image: grafana/grafana:11.0.0
     container_name: grafana
@@ -338,26 +295,51 @@ services:
       - grafana-data:/var/lib/grafana
     depends_on:
       - prometheus
-      - loki
-      - tempo
     networks:
       - default
 
-  # Telemetry Consumer - Consumes analytics.events from RabbitMQ → OTLP
-  telemetry-consumer:
-    build:
-      context: ../streaming-telemetry/consumer
-    container_name: telemetry-consumer
+  # cAdvisor - Per-container CPU / memory / network (signals 2, 3, 6)
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: cadvisor
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - "8083:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - default
+
+  # Redis Exporter - Redis command latency (signal 8)
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.62.0
+    container_name: redis-exporter
     restart: unless-stopped
     environment:
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
-      - OTEL_EXPORTER_OTLP_ENDPOINT=otelcol:4317
-      - WORKER_COUNT=4
+      - REDIS_ADDR=redis://redis:6379
     depends_on:
-      rabbitmq:
+      redis:
         condition: service_healthy
-      otelcol:
-        condition: service_started
+    networks:
+      - default
+
+  # MongoDB Exporter - opLatencies (signal 9)
+  mongodb-exporter:
+    image: percona/mongodb_exporter:0.40
+    container_name: mongodb-exporter
+    restart: unless-stopped
+    command:
+      - --mongodb.uri=mongodb://admin:password@mongodb:27017/?authSource=admin
+      - --collect-all
+      - --compatible-mode
+    depends_on:
+      mongodb:
+        condition: service_healthy
     networks:
       - default
 
@@ -367,8 +349,6 @@ volumes:
   redis_data:
   minio_data:
   prometheus-data:
-  loki-data:
-  tempo-data:
   grafana-data:
 
 networks:
