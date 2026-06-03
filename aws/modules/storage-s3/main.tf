@@ -36,11 +36,14 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
   }
 }
 
-# Disable versioning by default to save costs
+# Disable versioning by default to save costs.
+# "Disabled" (não "Suspended") é o valor válido para um bucket que NUNCA teve
+# versioning — evita InvalidBucketState no apply de adoção. "Suspended" só é
+# aceito se o bucket já esteve "Enabled".
 resource "aws_s3_bucket_versioning" "this" {
   bucket = aws_s3_bucket.this.id
   versioning_configuration {
-    status = "Suspended"
+    status = "Disabled"
   }
 }
 
@@ -75,7 +78,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
     expiration {
       days = 90
     }
-    
+
     # Optional: If you prefer to store in Deep Archive instead of deleting,
     # comment the `expiration` block above and uncomment the block below:
     # transition {
@@ -83,4 +86,11 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
     #   storage_class = "DEEP_ARCHIVE"
     # }
   }
+}
+
+# Habilita entrega de eventos do bucket para o EventBridge.
+# A regra EventBridge → ingest é criada no Plano 2 (módulo ingest-lambda).
+resource "aws_s3_bucket_notification" "this" {
+  bucket      = aws_s3_bucket.this.id
+  eventbridge = true
 }
