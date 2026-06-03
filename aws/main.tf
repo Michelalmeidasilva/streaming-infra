@@ -32,6 +32,80 @@ module "ssm_secrets" {
   s3_secret_access_key = module.iam_s3.iam_secret_access_key
 }
 
+# 5. ECR — repositórios de imagem para os 3 serviços container.
+module "ecr" {
+  source           = "./modules/ecr"
+  repository_names = ["vod-ingest", "vod-distribution", "vod-transcode"]
+}
+
+# 6. Lambda do ingest (Event Gateway).
+module "ingest_lambda" {
+  source              = "./modules/ingest-lambda"
+  function_name       = "streaming-ingest"
+  image_uri           = "${module.ecr.repository_urls["vod-ingest"]}:latest"
+  storage_bucket_name = module.storage_s3.bucket_id
+  ssm_parameter_arns  = module.ssm_secrets.parameter_arns
+
+  mongodb_uri  = var.mongodb_uri
+  rabbitmq_url = var.rabbitmq_url
+}
+
+output "ingest_function_url" {
+  value = module.ingest_lambda.function_url
+}
+
+# 7. Lambda do distribution (read-only, cache-aside) + CloudFront.
+module "distribution_lambda" {
+  source              = "./modules/distribution-lambda"
+  function_name       = "streaming-distribution"
+  image_uri           = "${module.ecr.repository_urls["vod-distribution"]}:latest"
+  storage_bucket_name = module.storage_s3.bucket_id
+  ssm_parameter_arns  = module.ssm_secrets.parameter_arns
+
+  mongodb_uri          = var.mongodb_uri
+  redis_url            = var.redis_url
+  s3_access_key_id     = module.iam_s3.iam_access_key_id
+  s3_secret_access_key = module.iam_s3.iam_secret_access_key
+}
+
+output "distribution_cdn_domain" {
+  value = module.distribution_lambda.cdn_domain
+}
+
+# 8. Batch Fargate Spot para o transcode.
+module "transcode_batch" {
+  source               = "./modules/transcode-batch"
+  environment          = var.environment
+  image_uri            = "${module.ecr.repository_urls["vod-transcode"]}:latest"
+  subnet_ids           = module.network.public_subnet_ids
+  security_group_id    = module.network.batch_security_group_id
+  storage_bucket_name  = module.storage_s3.bucket_id
+  ssm_parameter_prefix = module.ssm_secrets.parameter_prefix
+  ssm_parameter_arns   = module.ssm_secrets.parameter_arns
+  aws_region           = var.aws_region
+}
+
+# 9. EventBridge: S3→Batch (transcode) + S3→ingest (API Destination).
+module "events" {
+  source                   = "./modules/events"
+  environment              = var.environment
+  bucket_name              = module.storage_s3.bucket_id
+  ingest_function_url      = module.ingest_lambda.function_url
+  batch_job_queue_arn      = module.transcode_batch.job_queue_arn
+  batch_job_definition_arn = module.transcode_batch.job_definition_arn
+}
+
+# 10. Web-client: bucket S3 privado + CloudFront OAC.
+module "web_client_cdn" {
+  source      = "./modules/web-client-cdn"
+  environment = var.environment
+  bucket_name = "vod-web-client-${var.environment}-use2"
+}
+
+output "web_client_cdn_domain" {
+  value = module.web_client_cdn.cdn_domain
+}
+
 output "bucket_name" {
   value = module.storage_s3.bucket_id
 }
