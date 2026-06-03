@@ -32,3 +32,9 @@ variable "aws_region" {
   type    = string
   default = "us-east-2"
 }
+
+variable "create_batch_service_linked_role" {
+  type        = bool
+  description = "Cria o SLR AWSServiceRoleForBatch. Defina false se ele já existir na conta."
+  default     = true
+}

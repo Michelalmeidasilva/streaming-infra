@@ -66,6 +66,15 @@ resource "aws_cloudwatch_log_group" "this" {
   retention_in_days = 14
 }
 
+# ---- Service-linked role do Batch ----
+# CreateComputeEnvironment falha numa conta/região nova se o SLR
+# AWSServiceRoleForBatch ainda não existe. Crie-o aqui (uma vez por conta).
+# Se já existir na conta, defina create_batch_service_linked_role=false.
+resource "aws_iam_service_linked_role" "batch" {
+  count            = var.create_batch_service_linked_role ? 1 : 0
+  aws_service_name = "batch.amazonaws.com"
+}
+
 # ---- Batch compute environment (Fargate Spot) ----
 resource "aws_batch_compute_environment" "this" {
   compute_environment_name = "vod-${var.environment}-transcode"
@@ -77,6 +86,8 @@ resource "aws_batch_compute_environment" "this" {
     subnets            = var.subnet_ids
     security_group_ids = [var.security_group_id]
   }
+
+  depends_on = [aws_iam_service_linked_role.batch]
 }
 
 resource "aws_batch_job_queue" "this" {
