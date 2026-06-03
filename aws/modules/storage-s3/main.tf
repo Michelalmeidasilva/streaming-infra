@@ -84,3 +84,10 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
     # }
   }
 }
+
+# Habilita entrega de eventos do bucket para o EventBridge.
+# A regra EventBridge → ingest é criada no Plano 2 (módulo ingest-lambda).
+resource "aws_s3_bucket_notification" "this" {
+  bucket      = aws_s3_bucket.this.id
+  eventbridge = true
+}
