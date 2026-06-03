@@ -1,0 +1,22 @@
+aws_region: us-east-2
+environment_name: prod
+
+# Repositórios ECR (nomes definidos no Plano 2)
+ecr_repos:
+  ingest: vod-ingest
+  distribution: vod-distribution
+  transcode: vod-transcode
+
+# Funções/recursos (nomes definidos no Plano 2)
+ingest_function_name: streaming-ingest
+distribution_function_name: streaming-distribution
+batch_job_definition: vod-prod-transcode
+
+# Caminhos dos serviços (relativos à raiz do monorepo)
+services_root: "{{ playbook_dir }}/../.."
+web_client_dir: "{{ services_root }}/streaming-web-client"
+
+# CloudAMQP management API (host sem o amqps://). Ex.: <subdominio>.cloudamqp.com
+# Os segredos (user/pass/vhost) ficam em vault.yml (Task 4).
+cloudamqp_mgmt_scheme: https
+cloudamqp_mgmt_port: 443

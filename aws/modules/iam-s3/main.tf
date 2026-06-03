@@ -21,7 +21,7 @@ data "aws_iam_policy_document" "s3_access" {
       "s3:ListMultipartUploadParts",
       "s3:ListBucketMultipartUploads"
     ]
-    
+
     # Restrict to the specific bucket and its contents
     resources = [
       var.bucket_arn,

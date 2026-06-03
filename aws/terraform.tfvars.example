@@ -1,0 +1,6 @@
+# Copie para terraform.tfvars (git-ignored) e preencha com valores reais.
+storage_bucket_name = "PREENCHER-com-o-nome-do-bucket-existente"
+
+mongodb_uri  = "mongodb+srv://user:pass@cluster.mongodb.net/streaming"
+rabbitmq_url = "amqps://user:pass@host.cloudamqp.com/vhost"
+redis_url    = "rediss://user:pass@host:6379"

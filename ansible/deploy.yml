@@ -1,0 +1,37 @@
+---
+- name: Deploy latest images to Lambda + refresh Batch job definition
+  hosts: local
+  gather_facts: false
+  vars:
+    lambdas:
+      - { name: "{{ ingest_function_name }}", repo: "{{ ecr_repos.ingest }}" }
+      - { name: "{{ distribution_function_name }}", repo: "{{ ecr_repos.distribution }}" }
+  tasks:
+    - name: Get AWS account id
+      ansible.builtin.command: aws sts get-caller-identity --query Account --output text
+      register: aws_account
+      changed_when: false
+
+    - name: Set registry fact
+      ansible.builtin.set_fact:
+        registry: "{{ aws_account.stdout }}.dkr.ecr.{{ aws_region }}.amazonaws.com"
+
+    - name: Update Lambda function code (new image)
+      ansible.builtin.command: >
+        aws lambda update-function-code
+        --region {{ aws_region }}
+        --function-name {{ item.name }}
+        --image-uri {{ registry }}/{{ item.repo }}:latest
+      loop: "{{ lambdas }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Wait for Lambda updates to settle
+      ansible.builtin.command: >
+        aws lambda wait function-updated
+        --region {{ aws_region }}
+        --function-name {{ item.name }}
+      loop: "{{ lambdas }}"
+      loop_control:
+        label: "{{ item.name }}"
+      changed_when: false
