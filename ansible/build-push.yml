@@ -1,0 +1,39 @@
+---
+- name: Build and push service images to ECR
+  hosts: local
+  gather_facts: false
+  vars:
+    services:
+      - { name: ingest, dir: streaming-ingest, repo: "{{ ecr_repos.ingest }}" }
+      - { name: distribution, dir: streaming-distribution, repo: "{{ ecr_repos.distribution }}" }
+      - { name: transcode, dir: streaming-transcode, repo: "{{ ecr_repos.transcode }}" }
+  tasks:
+    - name: Get AWS account id
+      ansible.builtin.command: aws sts get-caller-identity --query Account --output text
+      register: aws_account
+      changed_when: false
+
+    - name: Set registry fact
+      ansible.builtin.set_fact:
+        registry: "{{ aws_account.stdout }}.dkr.ecr.{{ aws_region }}.amazonaws.com"
+
+    - name: ECR login
+      ansible.builtin.shell: >
+        aws ecr get-login-password --region {{ aws_region }}
+        | docker login --username AWS --password-stdin {{ registry }}
+      changed_when: false
+
+    - name: Build images (linux/amd64)
+      ansible.builtin.command: >
+        docker build --platform linux/amd64
+        -t {{ registry }}/{{ item.repo }}:latest
+        {{ services_root }}/{{ item.dir }}
+      loop: "{{ services }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Push images
+      ansible.builtin.command: docker push {{ registry }}/{{ item.repo }}:latest
+      loop: "{{ services }}"
+      loop_control:
+        label: "{{ item.name }}"
