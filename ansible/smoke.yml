@@ -1,0 +1,39 @@
+---
+- name: Post-deploy smoke tests
+  hosts: local
+  gather_facts: false
+  tasks:
+    - name: Read terraform outputs
+      ansible.builtin.command: >
+        {{ playbook_dir }}/../bin/terraform -chdir={{ playbook_dir }}/../aws output -json
+      register: tf_out
+      changed_when: false
+
+    - name: Parse endpoints
+      ansible.builtin.set_fact:
+        ingest_url: "{{ (tf_out.stdout | from_json).ingest_function_url.value }}"
+        distribution_url: "{{ (tf_out.stdout | from_json).distribution_cdn_domain.value }}"
+        web_url: "{{ (tf_out.stdout | from_json).web_client_cdn_domain.value }}"
+
+    - name: ingest /health
+      ansible.builtin.uri:
+        url: "{{ ingest_url }}health"
+        status_code: 200
+
+    - name: distribution /health
+      ansible.builtin.uri:
+        url: "{{ distribution_url }}/health"
+        status_code: 200
+
+    - name: web-client root
+      ansible.builtin.uri:
+        url: "{{ web_url }}/"
+        status_code: 200
+
+    - name: Batch job queue is VALID
+      ansible.builtin.command: >
+        aws batch describe-job-queues --region {{ aws_region }}
+        --query "jobQueues[?jobQueueName=='vod-prod-transcode'].status | [0]" --output text
+      register: jq
+      changed_when: false
+      failed_when: jq.stdout != "VALID"
