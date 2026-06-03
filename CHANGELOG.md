@@ -1,5 +1,12 @@
 ## [Unreleased] 2026-06-03
 ### Added
+- Camada Ansible: build-push (ECR), deploy (lambda update-function-code), configure-broker (topologia CloudAMQP via management API), web-client (build SvelteKit + s3 sync + invalidação CloudFront) e smoke (health checks). Segredos do broker em Ansible Vault.
+
+### Próximo passo (documentado, não implementado)
+- GitHub Actions + OIDC: assumir IAM Role federada (sem chave AWS no repo), rodar `terraform plan` no PR e `apply` no merge; encadear os playbooks Ansible no pipeline.
+
+## [Unreleased] 2026-06-03
+### Added
 - Serviços de compute na AWS (us-east-2): ingest+distribution como Lambda container (Function URL, distribution atrás de CloudFront PriceClass_100), transcode como AWS Batch Fargate Spot disparado por EventBridge (S3 raw/ -> SubmitJob), web-client em S3+CloudFront com OAC. ECR para as 3 imagens. EventBridge S3->ingest (API Destination) preserva o contrato de webhook.
 - Terraform foundation AWS (us-east-2): backend S3 + lock nativo, módulos network/ssm-secrets, adoção do bucket S3 existente via import, IAM least-privilege, secrets no SSM. Script de auditoria read-only para recursos existentes.
 
