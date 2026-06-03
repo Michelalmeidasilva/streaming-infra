@@ -1,0 +1,45 @@
+---
+- name: Build and publish streaming-web-client to S3 + CloudFront
+  hosts: local
+  gather_facts: false
+  tasks:
+    - name: Read terraform outputs
+      ansible.builtin.command: >
+        {{ playbook_dir }}/../bin/terraform -chdir={{ playbook_dir }}/../aws output -json
+      register: tf_out
+      changed_when: false
+
+    - name: Parse outputs
+      ansible.builtin.set_fact:
+        site_bucket: "{{ (tf_out.stdout | from_json).web_client_cdn_domain.value | regex_replace('^https://', '') }}"
+        distribution_url: "{{ (tf_out.stdout | from_json).distribution_cdn_domain.value }}"
+
+    # O bucket do site não é exposto como output; busque pelo nome convencionado.
+    - name: Resolve site bucket name
+      ansible.builtin.set_fact:
+        web_bucket: "vod-web-client-{{ environment_name }}-use2"
+
+    - name: Resolve CloudFront distribution id for the web bucket
+      ansible.builtin.shell: >
+        aws cloudfront list-distributions --region {{ aws_region }}
+        --query "DistributionList.Items[?Comment=='vod streaming-web-client'].Id | [0]"
+        --output text
+      register: cf_id
+      changed_when: false
+
+    - name: Install deps + build (PUBLIC_DISTRIBUTION_URL baked at build time)
+      ansible.builtin.shell: npm install && npm run build
+      args:
+        chdir: "{{ web_client_dir }}"
+      environment:
+        PUBLIC_DISTRIBUTION_URL: "{{ distribution_url }}"
+        PUBLIC_API_KEY: "pk_prod"
+
+    - name: Sync build output to S3
+      ansible.builtin.command: >
+        aws s3 sync {{ web_client_dir }}/build s3://{{ web_bucket }}/ --delete --region {{ aws_region }}
+
+    - name: Invalidate CloudFront cache
+      ansible.builtin.command: >
+        aws cloudfront create-invalidation --distribution-id {{ cf_id.stdout }} --paths "/*"
+      when: cf_id.stdout | length > 0
