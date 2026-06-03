@@ -28,11 +28,13 @@ services:
     ports:
       - "5672:5672"      # AMQP port
       - "15672:15672"    # Management UI port (http://localhost:15672 - guest/guest)
+      - "15692:15692"    # Prometheus metrics
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
     healthcheck:
       test: rabbitmq-diagnostics -q ping
       interval: 10s
@@ -91,6 +93,8 @@ services:
       echo 'Applying MinIO CORS policy...';
       printf '%s' '<CORSConfiguration><CORSRule><AllowedOrigin>*</AllowedOrigin><AllowedMethod>GET</AllowedMethod><AllowedMethod>PUT</AllowedMethod><AllowedMethod>POST</AllowedMethod><AllowedMethod>DELETE</AllowedMethod><AllowedMethod>HEAD</AllowedMethod><AllowedHeader>*</AllowedHeader><ExposeHeader>ETag</ExposeHeader><ExposeHeader>x-amz-request-id</ExposeHeader><MaxAgeSeconds>3600</MaxAgeSeconds></CORSRule></CORSConfiguration>' >/tmp/videos-cors.xml;
       /usr/bin/mc cors set local/videos /tmp/videos-cors.xml;
+      echo 'Making videos bucket public for download (playback of relative HLS/DASH children)...';
+      /usr/bin/mc anonymous set download local/videos;
       echo 'MinIO setup completed!';
       "
 
@@ -136,14 +140,22 @@ services:
     container_name: streaming-platform-upload
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      # Host 3001 -> container 3000 (host :3000 may be taken by an unrelated
+      # grafana/telemetry container; inter-service comms use the docker network).
+      - "3001:3000"
     env_file:
-      - ../streaming-platform-upload/.env.example
+      - ../streaming-platform-upload/.env
     environment:
       EVENT_GATEWAY_URL: http://event-gateway:8080/api/v1
       INGEST_PERSISTENCE_BASE_URL: http://event-gateway:8080/api/v1
       INGEST_STORAGE_WEBHOOK_BASE_URL: http://event-gateway:8080/api/v1
+      # Use local MinIO (override the s3 defaults from .env.example). Credentials
+      # must match the minio service (admin/password123), not the example values.
+      STORAGE_PROVIDER: minio
+      STORAGE_BUCKET: videos
       MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: admin
+      MINIO_SECRET_KEY: password123
       E2E_AUTH_ENABLED: "1"
       NEXT_PUBLIC_E2E_AUTH_ENABLED: "1"
       E2E_ADMIN_EMAIL: admin@local.dev
@@ -174,6 +186,40 @@ services:
     networks:
       - default
 
+  # Streaming Distribution - Serves manifest URLs to consumer clients
+  streaming-distribution:
+    build:
+      context: ../streaming-distribution
+      dockerfile: Dockerfile
+    container_name: streaming-distribution
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    env_file:
+      - ../streaming-distribution/.env
+    environment:
+      SERVER_PORT: 8082
+      MONGODB_URI: mongodb://admin:password@mongodb:27017/streaming?authSource=admin
+      REDIS_URL: redis://redis:6379
+      STORAGE_PROVIDER: minio
+      STORAGE_BUCKET: videos
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password123
+      # Public URL mode: browser plays manifests directly from MinIO; relative
+      # child playlists/segments resolve because the bucket is public-read.
+      CDN_BASE: http://localhost:9000/videos
+      TRANSCODED_PREFIX: transcoded
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - default
+
   # Web Client - Consumer-facing PWA (SvelteKit + Shaka Player)
   streaming-web-client:
     build:
@@ -185,6 +231,8 @@ services:
         PUBLIC_API_KEY: pk_dev
     container_name: streaming-web-client
     restart: unless-stopped
+    env_file:
+      - ../streaming-web-client/.env
     ports:
       - "5173:80"    # http://localhost:5173
     networks:
@@ -207,11 +255,121 @@ services:
       mongodb:
         condition: service_healthy
 
+  # ── streaming-telemetry: Observability stack (OTEL + Prometheus/Loki/Tempo/Grafana) ──
+
+  # OTEL Collector - Central ingestion point for metrics, logs and traces (OTLP)
+  otelcol:
+    build:
+      context: ../streaming-telemetry/collector
+    container_name: otelcol
+    restart: unless-stopped
+    ports:
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+      - "8888:8888"    # Collector self-metrics
+      - "8889:8889"    # Prometheus exporter
+    networks:
+      - default
+
+  # Prometheus - Metrics storage scraped from the OTEL Collector
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ../streaming-telemetry/collector/prometheus-config.yaml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    depends_on:
+      - otelcol
+    networks:
+      - default
+
+  # Loki - Log aggregation backend
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    volumes:
+      - ../streaming-telemetry/collector/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - default
+
+  # Tempo - Distributed tracing backend
+  tempo:
+    image: grafana/tempo:2.5.0
+    container_name: tempo
+    restart: unless-stopped
+    ports:
+      - "3200:3200"
+      - "4319:4317"    # OTLP gRPC (remapped to avoid clash with otelcol:4317)
+    volumes:
+      - ../streaming-telemetry/collector/tempo-config.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    command: -config.file=/etc/tempo.yaml
+    networks:
+      - default
+
+  # Grafana - Unified dashboards over Prometheus/Loki/Tempo (host :3000)
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    volumes:
+      - ../streaming-telemetry/dashboards/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+      - ../streaming-telemetry/dashboards/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:ro
+      - ../streaming-telemetry/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+    networks:
+      - default
+
+  # Telemetry Consumer - Consumes analytics.events from RabbitMQ → OTLP
+  telemetry-consumer:
+    build:
+      context: ../streaming-telemetry/consumer
+    container_name: telemetry-consumer
+    restart: unless-stopped
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - OTEL_EXPORTER_OTLP_ENDPOINT=otelcol:4317
+      - WORKER_COUNT=4
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      otelcol:
+        condition: service_started
+    networks:
+      - default
+
 volumes:
   mongodb_data:
   rabbitmq_data:
   redis_data:
   minio_data:
+  prometheus-data:
+  loki-data:
+  tempo-data:
+  grafana-data:
 
 networks:
   default:
