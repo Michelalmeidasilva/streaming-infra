@@ -1,4 +1,8 @@
 ## [Unreleased] 2026-06-03
+### Added
+- Terraform foundation AWS (us-east-2): backend S3 + lock nativo, módulos network/ssm-secrets, adoção do bucket S3 existente via import, IAM least-privilege, secrets no SSM. Script de auditoria read-only para recursos existentes.
+
+## [Unreleased] 2026-06-03
 ### Changed
 - Stack de observabilidade simplificada para metrics-only: removidos `otelcol`, `loki`,
   `tempo` e `telemetry-consumer`; adicionados `cadvisor`, `redis-exporter`,
