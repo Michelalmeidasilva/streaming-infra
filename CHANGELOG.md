@@ -1,5 +1,6 @@
 ## [Unreleased] 2026-06-03
 ### Added
+- Serviços de compute na AWS (us-east-2): ingest+distribution como Lambda container (Function URL, distribution atrás de CloudFront PriceClass_100), transcode como AWS Batch Fargate Spot disparado por EventBridge (S3 raw/ -> SubmitJob), web-client em S3+CloudFront com OAC. ECR para as 3 imagens. EventBridge S3->ingest (API Destination) preserva o contrato de webhook.
 - Terraform foundation AWS (us-east-2): backend S3 + lock nativo, módulos network/ssm-secrets, adoção do bucket S3 existente via import, IAM least-privilege, secrets no SSM. Script de auditoria read-only para recursos existentes.
 
 ## [Unreleased] 2026-06-03
