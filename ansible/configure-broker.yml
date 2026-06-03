@@ -1,0 +1,57 @@
+---
+- name: Declare RabbitMQ topology on CloudAMQP
+  hosts: local
+  gather_facts: false
+  vars_files:
+    - vault.yml
+  vars:
+    api_base: "{{ cloudamqp_mgmt_scheme }}://{{ cloudamqp_host }}:{{ cloudamqp_mgmt_port }}/api"
+    vhost_enc: "{{ cloudamqp_vhost | urlencode }}"
+    exchange: video_events
+    queues:
+      - { name: transcoding_queue, key: "video.upload.*" }
+      - { name: distribution_queue, key: "video.transcode.completed" }
+      - { name: telemetry_queue, key: "video.*.*" }
+  tasks:
+    - name: Declare topic exchange
+      ansible.builtin.uri:
+        url: "{{ api_base }}/exchanges/{{ vhost_enc }}/{{ exchange }}"
+        method: PUT
+        user: "{{ cloudamqp_user }}"
+        password: "{{ cloudamqp_pass }}"
+        force_basic_auth: true
+        body_format: json
+        body:
+          type: topic
+          durable: true
+        status_code: [201, 204]
+
+    - name: Declare durable queues
+      ansible.builtin.uri:
+        url: "{{ api_base }}/queues/{{ vhost_enc }}/{{ item.name }}"
+        method: PUT
+        user: "{{ cloudamqp_user }}"
+        password: "{{ cloudamqp_pass }}"
+        force_basic_auth: true
+        body_format: json
+        body:
+          durable: true
+        status_code: [201, 204]
+      loop: "{{ queues }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Bind queues to exchange with routing keys
+      ansible.builtin.uri:
+        url: "{{ api_base }}/bindings/{{ vhost_enc }}/e/{{ exchange }}/q/{{ item.name }}"
+        method: POST
+        user: "{{ cloudamqp_user }}"
+        password: "{{ cloudamqp_pass }}"
+        force_basic_auth: true
+        body_format: json
+        body:
+          routing_key: "{{ item.key }}"
+        status_code: [201, 204]
+      loop: "{{ queues }}"
+      loop_control:
+        label: "{{ item.name }} <- {{ item.key }}"
