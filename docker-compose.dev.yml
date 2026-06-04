@@ -1,0 +1,135 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# DEV OVERRIDE — hot reload para todos os serviços de código.
+#
+# Este arquivo NÃO é carregado automaticamente pelo `docker compose up`.
+# Ele só entra quando explicitamente combinado com o base:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# Ou, mais simples, pela raiz do monorepo:
+#
+#   make development-infra
+#
+# O que ele faz por serviço de código:
+#   - `build: !reset null`  → desliga o build de produção (multistage/standalone)
+#   - troca por uma imagem base com toolchain (go / node)
+#   - faz bind-mount do código-fonte
+#   - roda um watcher que recompila/recarrega a cada alteração de arquivo
+#
+# Os serviços de infraestrutura (mongo, rabbitmq, redis, minio, prometheus,
+# grafana, exporters, mongo-express) NÃO são redefinidos aqui — sobem do base
+# exatamente como sempre.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  # ── streaming-ingest (Go / Event Gateway :8080) — air hot reload ─────────────
+  streaming-ingest:
+    build: !reset null
+    image: golang:1.25
+    working_dir: /app
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        go install github.com/air-verse/air@latest
+        printf 'root="."\ntmp_dir="/tmp/air"\n[build]\ncmd="go build -o /tmp/air/main ./cmd/api"\nbin="/tmp/air/main"\ndelay=800\nstop_on_error=true\n' > /tmp/air.toml
+        exec air -c /tmp/air.toml
+    volumes:
+      - ../streaming-ingest:/app
+      - ingest_go_cache:/go
+    environment:
+      # config.yaml é lido do código montado; estas env vars vêm do base e
+      # continuam valendo (merge). Repetidas aqui só por clareza não é preciso.
+      GOFLAGS: -buildvcs=false
+
+  # ── streaming-distribution (Go backend :8082) — air hot reload ───────────────
+  streaming-distribution:
+    build: !reset null
+    image: golang:1.25
+    working_dir: /app
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        go install github.com/air-verse/air@latest
+        printf 'root="."\ntmp_dir="/tmp/air"\n[build]\ncmd="go build -o /tmp/air/main ./cmd/api"\nbin="/tmp/air/main"\ndelay=800\nstop_on_error=true\n' > /tmp/air.toml
+        exec air -c /tmp/air.toml
+    volumes:
+      - ../streaming-distribution:/app
+      - distribution_go_cache:/go
+    environment:
+      GOFLAGS: -buildvcs=false
+
+  # ── streaming-transcode (Go worker + ffmpeg) — air hot reload ────────────────
+  # Precisa de ffmpeg no container; instala no primeiro start (lento na 1ª vez).
+  streaming-transcode:
+    build: !reset null
+    image: golang:1.26-bookworm
+    working_dir: /app
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        command -v ffmpeg >/dev/null || (apt-get update && apt-get install -y --no-install-recommends ffmpeg)
+        go install github.com/air-verse/air@latest
+        printf 'root="."\ntmp_dir="/tmp/air"\n[build]\ncmd="go build -o /tmp/air/worker ./cmd/worker"\nbin="/tmp/air/worker"\ndelay=800\nstop_on_error=true\n' > /tmp/air.toml
+        exec air -c /tmp/air.toml
+    volumes:
+      - ../streaming-transcode:/app
+      - transcode_go_cache:/go
+    environment:
+      GOFLAGS: -buildvcs=false
+
+  # ── streaming-platform-upload (Next.js :3000) — next dev / Fast Refresh ──────
+  streaming-platform-upload:
+    build: !reset null
+    image: node:20-alpine
+    working_dir: /app
+    command:
+      - sh
+      - -c
+      - npm install && npm run dev
+    volumes:
+      - ../streaming-platform-upload:/app
+      - upload_node_modules:/app/node_modules
+    environment:
+      # Em `next dev` as NEXT_PUBLIC_* são lidas em runtime (não "assadas" no
+      # bundle como no build de produção), então passamos por env aqui.
+      NEXT_PUBLIC_E2E_AUTH_ENABLED: "1"
+      NEXT_PUBLIC_E2E_ADMIN_EMAIL: admin@local.dev
+      NEXT_PUBLIC_STORAGE_DIRECT_UPLOAD_ENABLED: "false"
+      # File watching confiável sobre bind-mount no Docker Desktop (macOS).
+      WATCHPACK_POLLING: "true"
+
+  # ── streaming-web-client (SvelteKit + Vite) — vite dev / HMR ─────────────────
+  streaming-web-client:
+    build: !reset null
+    image: node:20-alpine
+    working_dir: /app
+    command:
+      - sh
+      - -c
+      - npm install && npm run dev -- --host 0.0.0.0 --port 5173
+    volumes:
+      - ../streaming-web-client:/app
+      - webclient_node_modules:/app/node_modules
+    ports: !override
+      - "5173:5173"
+    environment:
+      # PUBLIC_* lidas pelo vite dev em runtime (no prod são baked no build).
+      PUBLIC_DISTRIBUTION_URL: http://localhost:8082
+      PUBLIC_API_KEY: pk_dev
+      # HMR confiável sobre bind-mount no Docker Desktop (macOS).
+      CHOKIDAR_USEPOLLING: "true"
+
+volumes:
+  # Caches por serviço para que `go install air` e o module cache persistam
+  # entre restarts (1ª subida baixa, as seguintes são rápidas).
+  ingest_go_cache:
+  distribution_go_cache:
+  transcode_go_cache:
+  upload_node_modules:
+  webclient_node_modules:
