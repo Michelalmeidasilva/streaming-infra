@@ -32,8 +32,22 @@ def emit(record):
             unit = metric.get("Unit", "None")
             if name not in record:
                 continue
+            # Dimensionless rollup (one per metric) — required for moto dev env because
+            # moto does not implement Metric Insights SEARCH; exact-match dimensionless
+            # queries DO work and the Grafana dashboard targets these.
+            try:
+                cw.put_metric_data(
+                    Namespace=namespace,
+                    MetricData=[{"MetricName": name, "Dimensions": [],
+                                 "Value": float(record[name]), "Unit": unit}],
+                )
+            except Exception as e:  # noqa: BLE001 - dev tool, keep tailing
+                print(f"[emf-forwarder] put_metric_data (rollup) failed: {e}", flush=True)
             for dim_names in dim_sets:
                 dims = [{"Name": d, "Value": str(record[d])} for d in dim_names if d in record]
+                if not dims:
+                    # skip: empty-dim set would duplicate the rollup already emitted above
+                    continue
                 try:
                     cw.put_metric_data(
                         Namespace=namespace,
