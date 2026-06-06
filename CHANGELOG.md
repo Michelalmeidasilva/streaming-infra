@@ -1,3 +1,12 @@
+## [Unreleased] 2026-06-06
+### Added
+- Dev observability via moto (OSS CloudWatch emulator) + emf-forwarder sidecar + Grafana CloudWatch datasource.
+- Managed CloudWatch log groups (14d retention) for the ingest/distribution Lambdas.
+### Removed
+- Prometheus/cadvisor/redis-exporter/mongodb-exporter pull stack from docker-compose.
+### Notes
+- Prod CloudWatch dashboard/alarms module is specified (plan A2–A4) but deferred until terraform tooling is available.
+
 ## [Unreleased] 2026-06-03
 ### Added
 - Camada Ansible: build-push (ECR), deploy (lambda update-function-code), configure-broker (topologia CloudAMQP via management API), web-client (build SvelteKit + s3 sync + invalidação CloudFront) e smoke (health checks). Segredos do broker em Ansible Vault.
