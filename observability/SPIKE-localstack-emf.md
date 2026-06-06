@@ -57,3 +57,33 @@ Neither free path delivers queryable CloudWatch metrics in dev.
    community CloudWatch metric support is limited, not recommended.
 
 Until the user picks, B2 and B3 are blocked.
+
+## UPDATE — free/OSS alternative found: moto (getmoto/moto, Apache-2.0)
+
+Tested `motoserver/moto:latest` (open source). It works with the current aws CLI where
+LocalStack community failed.
+
+- macOS gotcha: host port 5000 is taken by AirPlay (AirTunes) — map moto to **5001:5000**.
+- `cloudwatch put-metric-data` ✅ (no protocol error) and `list-metrics` returns the metric.
+- `cloudwatch get-metric-data` ✅ returns `Values:[1.0]` — this is the API Grafana's CloudWatch
+  datasource uses, so **Grafana → moto** is viable.
+- `logs create-log-group` / `describe-log-groups` ✅.
+- **EMF extraction: NO** — pushing an EMF log event to a log group did NOT create a metric
+  (`list-metrics` for that namespace stayed empty). moto mocks API calls; it does not run the
+  server-side EMF→metric pipeline. (Same limitation as community LocalStack — no free emulator
+  reproduces EMF extraction.)
+
+### Recommended dev architecture (free, faithful, keeps Plan 1 code untouched)
+```
+services (EMF → stdout, UNCHANGED)
+   → emf-forwarder sidecar  (tails container logs via docker socket, parses each EMF JSON
+                             line, calls CloudWatch PutMetricData)  → moto (cloudwatch+logs)
+   → Grafana (CloudWatch datasource, endpoint=http://moto:5000)  → get-metric-data
+```
+Why a sidecar instead of dual-sink in the app: it keeps the Plan-1 emitters pure (EMF to
+stdout only, identical to prod) and isolates ALL dev-only translation in one ~30-line
+container. No app code reopened. Only free/OSS pieces (moto + tiny Python + Grafana OSS).
+
+This supersedes the original B2 "vector forwarder" (vector ships logs, but nothing would
+extract EMF; the sidecar does the extraction itself). B2/B3 to be rewritten around moto +
+emf-forwarder.
