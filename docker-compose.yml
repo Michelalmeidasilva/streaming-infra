@@ -267,29 +267,7 @@ services:
       mongodb:
         condition: service_healthy
 
-  # ── streaming-telemetry: Observability stack (Prometheus + Grafana + exporters) ──
-
-  # Prometheus - Metrics storage
-  prometheus:
-    image: prom/prometheus:v2.53.0
-    container_name: prometheus
-    restart: unless-stopped
-    ports:
-      - "9090:9090"
-    volumes:
-      - ../streaming-telemetry/collector/prometheus-config.yaml:/etc/prometheus/prometheus.yml:ro
-      - prometheus-data:/prometheus
-    command:
-      - --config.file=/etc/prometheus/prometheus.yml
-      - --storage.tsdb.path=/prometheus
-      - --storage.tsdb.retention.time=15d
-      - --web.enable-lifecycle
-    depends_on:
-      - cadvisor
-    networks:
-      - default
-
-  # Grafana - Unified dashboards over Prometheus (host :3009)
+  # Grafana - Unified dashboards over CloudWatch/moto (host :3009)
   grafana:
     image: grafana/grafana:11.0.0
     container_name: grafana
@@ -307,51 +285,6 @@ services:
       - grafana-data:/var/lib/grafana
     depends_on:
       - moto
-    networks:
-      - default
-
-  # cAdvisor - Per-container CPU / memory / network (signals 2, 3, 6)
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.49.1
-    container_name: cadvisor
-    restart: unless-stopped
-    privileged: true
-    ports:
-      - "8083:8080"
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-      - /dev/disk/:/dev/disk:ro
-    networks:
-      - default
-
-  # Redis Exporter - Redis command latency (signal 8)
-  redis-exporter:
-    image: oliver006/redis_exporter:v1.62.0
-    container_name: redis-exporter
-    restart: unless-stopped
-    environment:
-      - REDIS_ADDR=redis://redis:6379
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - default
-
-  # MongoDB Exporter - opLatencies (signal 9)
-  mongodb-exporter:
-    image: percona/mongodb_exporter:0.40
-    container_name: mongodb-exporter
-    restart: unless-stopped
-    command:
-      - --mongodb.uri=mongodb://admin:password@mongodb:27017/?authSource=admin
-      - --collect-all
-      - --compatible-mode
-    depends_on:
-      mongodb:
-        condition: service_healthy
     networks:
       - default
 
@@ -387,7 +320,6 @@ volumes:
   rabbitmq_data:
   redis_data:
   minio_data:
-  prometheus-data:
   grafana-data:
 
 networks:
