@@ -24,6 +24,10 @@ services:
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
     container_name: rabbitmq
+    # Pin the hostname so the Erlang node is always rabbit@rabbitmq. Without it the
+    # node name follows the random container id, so every recreate starts a fresh
+    # node and orphans the durable queues/messages in the data volume.
+    hostname: rabbitmq
     restart: unless-stopped
     ports:
       - "5672:5672"      # AMQP port
@@ -35,6 +39,7 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
       - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/conf.d/10-consumer-timeout.conf:ro
     healthcheck:
       test: rabbitmq-diagnostics -q ping
       interval: 10s
@@ -99,11 +104,11 @@ services:
       "
 
   # Event Gateway - Ingests upload events and publishes to RabbitMQ
-  event-gateway:
+  streaming-ingest:
     build:
       context: ../streaming-ingest
       dockerfile: Dockerfile
-    container_name: event-gateway
+    container_name: streaming-ingest
     restart: unless-stopped
     ports:
       - "8080:8080"
@@ -137,32 +142,39 @@ services:
         NEXT_PUBLIC_E2E_AUTH_ENABLED: "1"
         NEXT_PUBLIC_E2E_ADMIN_EMAIL: admin@local.dev
         NEXT_PUBLIC_STORAGE_DIRECT_UPLOAD_ENABLED: "false"
+        # Must match UPLOAD_MAX_FILE_SIZE_GB in .env — NEXT_PUBLIC_* is inlined
+        # into the client bundle at build time, so env_file alone won't raise it.
+        NEXT_PUBLIC_UPLOAD_MAX_FILE_SIZE_GB: "10"
     container_name: streaming-platform-upload
     restart: unless-stopped
     ports:
-      # Host 3001 -> container 3000 (host :3000 may be taken by an unrelated
-      # grafana/telemetry container; inter-service comms use the docker network).
-      - "3001:3000"
+      # Host 3000 -> container 3000 (Grafana moved to host :3009 to free this up).
+      - "3000:3000"
     env_file:
       - ../streaming-platform-upload/.env
     environment:
-      EVENT_GATEWAY_URL: http://event-gateway:8080/api/v1
-      INGEST_PERSISTENCE_BASE_URL: http://event-gateway:8080/api/v1
-      INGEST_STORAGE_WEBHOOK_BASE_URL: http://event-gateway:8080/api/v1
+      EVENT_GATEWAY_URL: http://streaming-ingest:8080/api/v1
+      INGEST_PERSISTENCE_BASE_URL: http://streaming-ingest:8080/api/v1
+      INGEST_STORAGE_WEBHOOK_BASE_URL: http://streaming-ingest:8080/api/v1
       # Use local MinIO (override the s3 defaults from .env.example). Credentials
       # must match the minio service (admin/password123), not the example values.
-      STORAGE_PROVIDER: minio
-      STORAGE_BUCKET: videos
+      # Inside the container `localhost` is the container itself, so MINIO_ENDPOINT
+      # must use the `minio` service DNS name, not the host-oriented value in .env.
       MINIO_ENDPOINT: http://minio:9000
-      MINIO_ACCESS_KEY: admin
-      MINIO_SECRET_KEY: password123
-      E2E_AUTH_ENABLED: "1"
-      NEXT_PUBLIC_E2E_AUTH_ENABLED: "1"
-      E2E_ADMIN_EMAIL: admin@local.dev
-      NEXT_PUBLIC_E2E_ADMIN_EMAIL: admin@local.dev
-      ADMIN_EMAILS: admin@local.dev
+      # Browser-facing base for object URLs (e.g. thumbnails). Must be the
+      # host-published URL, since the browser cannot resolve the `minio` DNS name.
+      MINIO_PUBLIC_ENDPOINT: http://localhost:9000
+      # STORAGE_PROVIDER: minio
+      # STORAGE_BUCKET: videos
+      # MINIO_ACCESS_KEY: admin
+      # MINIO_SECRET_KEY: password123
+      # E2E_AUTH_ENABLED: "1"
+      # NEXT_PUBLIC_E2E_AUTH_ENABLED: "1"
+      # E2E_ADMIN_EMAIL: admin@local.dev
+      # NEXT_PUBLIC_E2E_ADMIN_EMAIL: admin@local.dev
+      # ADMIN_EMAILS: admin@local.dev
     depends_on:
-      - event-gateway
+      - streaming-ingest
       - minio
     networks:
       - default
@@ -181,7 +193,7 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-      event-gateway:
+      streaming-ingest:
         condition: service_started
     networks:
       - default
@@ -277,13 +289,13 @@ services:
     networks:
       - default
 
-  # Grafana - Unified dashboards over Prometheus (host :3000)
+  # Grafana - Unified dashboards over Prometheus (host :3009)
   grafana:
     image: grafana/grafana:11.0.0
     container_name: grafana
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3009:3000"
     environment:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
@@ -340,6 +352,33 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
+    networks:
+      - default
+
+  # Dev-only CloudWatch + Logs emulator (OSS). Host 5001 (5000 is AirPlay on macOS).
+  moto:
+    image: motoserver/moto:latest
+    container_name: moto
+    restart: unless-stopped
+    ports:
+      - "5001:5000"
+    networks:
+      - default
+
+  # Dev-only: parse service EMF stdout -> PutMetricData to moto.
+  emf-forwarder:
+    build: ./observability/emf-forwarder
+    container_name: emf-forwarder
+    restart: unless-stopped
+    environment:
+      - AWS_ENDPOINT_URL=http://moto:5000
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_REGION=us-east-1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - moto
     networks:
       - default
 
