@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: vod
+    folder: VOD
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards
