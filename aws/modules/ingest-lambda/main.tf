@@ -35,6 +35,11 @@ resource "aws_iam_role_policy" "ssm_read" {
   policy = data.aws_iam_policy_document.ssm_read.json
 }
 
+resource "aws_cloudwatch_log_group" "lambda" {
+  name              = "/aws/lambda/${var.function_name}"
+  retention_in_days = 14
+}
+
 resource "aws_lambda_function" "this" {
   function_name = var.function_name
   package_type  = "Image"
@@ -42,6 +47,7 @@ resource "aws_lambda_function" "this" {
   role          = aws_iam_role.this.arn
   timeout       = 30
   memory_size   = 512
+  depends_on    = [aws_cloudwatch_log_group.lambda]
 
   environment {
     variables = {
