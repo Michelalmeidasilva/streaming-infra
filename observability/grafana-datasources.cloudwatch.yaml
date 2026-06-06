@@ -1,0 +1,12 @@
+apiVersion: 1
+datasources:
+  - name: CloudWatch
+    type: cloudwatch
+    uid: cloudwatch
+    jsonData:
+      authType: keys
+      defaultRegion: us-east-1
+      endpoint: http://moto:5000
+    secureJsonData:
+      accessKey: test
+      secretKey: test

@@ -301,12 +301,12 @@ services:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       - GF_AUTH_DISABLE_LOGIN_FORM=true
     volumes:
-      - ../streaming-telemetry/dashboards/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
-      - ../streaming-telemetry/dashboards/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:ro
-      - ../streaming-telemetry/dashboards:/var/lib/grafana/dashboards:ro
+      - ./observability/grafana-datasources.cloudwatch.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+      - ./observability/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:ro
+      - ./observability/dashboards:/var/lib/grafana/dashboards:ro
       - grafana-data:/var/lib/grafana
     depends_on:
-      - prometheus
+      - moto
     networks:
       - default
 

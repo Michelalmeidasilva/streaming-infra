@@ -1,0 +1,360 @@
+{
+  "schemaVersion": 39,
+  "uid": "vod-golden-signals",
+  "title": "VOD Golden Signals",
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Requests",
+      "type": "timeseries",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "region": "us-east-1",
+          "namespace": "VOD/streaming-ingest",
+          "metricName": "RequestCount",
+          "statistic": "Sum",
+          "dimensions": {},
+          "matchExact": false,
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "period": "60",
+          "expression": "",
+          "alias": ""
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "region": "us-east-1",
+          "namespace": "VOD/streaming-distribution",
+          "metricName": "RequestCount",
+          "statistic": "Sum",
+          "dimensions": {},
+          "matchExact": false,
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "period": "60",
+          "expression": "",
+          "alias": ""
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "region": "us-east-1",
+          "namespace": "VOD/streaming-platform-upload",
+          "metricName": "RequestCount",
+          "statistic": "Sum",
+          "dimensions": {},
+          "matchExact": false,
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "period": "60",
+          "expression": "",
+          "alias": ""
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "single"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "title": "Errors",
+      "type": "timeseries",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "region": "us-east-1",
+          "namespace": "VOD/streaming-ingest",
+          "metricName": "ErrorCount",
+          "statistic": "Sum",
+          "dimensions": {},
+          "matchExact": false,
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "period": "60",
+          "expression": "",
+          "alias": ""
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "region": "us-east-1",
+          "namespace": "VOD/streaming-distribution",
+          "metricName": "ErrorCount",
+          "statistic": "Sum",
+          "dimensions": {},
+          "matchExact": false,
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "period": "60",
+          "expression": "",
+          "alias": ""
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "region": "us-east-1",
+          "namespace": "VOD/streaming-platform-upload",
+          "metricName": "ErrorCount",
+          "statistic": "Sum",
+          "dimensions": {},
+          "matchExact": false,
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "period": "60",
+          "expression": "",
+          "alias": ""
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "single"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "Latency (avg ms)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "region": "us-east-1",
+          "namespace": "VOD/streaming-ingest",
+          "metricName": "RequestLatency",
+          "statistic": "Average",
+          "dimensions": {},
+          "matchExact": false,
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "period": "60",
+          "expression": "",
+          "alias": ""
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "region": "us-east-1",
+          "namespace": "VOD/streaming-distribution",
+          "metricName": "RequestLatency",
+          "statistic": "Average",
+          "dimensions": {},
+          "matchExact": false,
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "period": "60",
+          "expression": "",
+          "alias": ""
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "region": "us-east-1",
+          "namespace": "VOD/streaming-platform-upload",
+          "metricName": "RequestLatency",
+          "statistic": "Average",
+          "dimensions": {},
+          "matchExact": false,
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "period": "60",
+          "expression": "",
+          "alias": ""
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "single"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "title": "Transcode jobs",
+      "type": "timeseries",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "region": "us-east-1",
+          "namespace": "VOD/streaming-transcode",
+          "metricName": "JobCount",
+          "statistic": "Sum",
+          "dimensions": {},
+          "matchExact": false,
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "period": "60",
+          "expression": "",
+          "alias": ""
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "region": "us-east-1",
+          "namespace": "VOD/streaming-transcode",
+          "metricName": "FailureCount",
+          "statistic": "Sum",
+          "dimensions": {},
+          "matchExact": false,
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "period": "60",
+          "expression": "",
+          "alias": ""
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "single"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      }
+    }
+  ],
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "links": [],
+  "tags": [
+    "vod",
+    "cloudwatch"
+  ]
+}
