@@ -5,3 +5,8 @@ output "job_queue_arn" {
 output "job_definition_arn" {
   value = aws_batch_job_definition.this.arn
 }
+
+output "log_group_name" {
+  description = "CloudWatch log group for transcode-batch jobs."
+  value       = aws_cloudwatch_log_group.this.name
+}
