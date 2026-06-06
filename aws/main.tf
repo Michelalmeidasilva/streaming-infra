@@ -117,3 +117,21 @@ output "vpc_id" {
 output "iam_access_key_id" {
   value = module.iam_s3.iam_access_key_id
 }
+
+# 11. Observability — CloudWatch dashboard + alarms (Plan 2 Phase A).
+module "observability" {
+  source    = "./modules/observability"
+  providers = { aws.us_east_1 = aws.us_east_1 }
+
+  environment = var.environment
+  aws_region  = var.aws_region
+
+  lambda_function_names      = ["streaming-ingest", "streaming-distribution"]
+  lambda_log_group_names     = [module.ingest_lambda.log_group_name, module.distribution_lambda.log_group_name]
+  cloudfront_distribution_id = module.distribution_lambda.cdn_distribution_id
+  batch_log_group_name       = module.transcode_batch.log_group_name
+}
+
+output "observability_dashboard" {
+  value = module.observability.dashboard_name
+}

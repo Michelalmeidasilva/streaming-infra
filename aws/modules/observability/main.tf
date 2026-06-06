@@ -65,3 +65,53 @@ resource "aws_cloudwatch_metric_alarm" "cloudfront_5xx" {
   alarm_actions       = local.alarm_actions
   ok_actions          = local.alarm_actions
 }
+
+resource "aws_cloudwatch_dashboard" "golden_signals" {
+  dashboard_name = "VOD-Golden-Signals-${var.environment}"
+  dashboard_body = jsonencode({
+    widgets = [
+      {
+        type = "metric", x = 0, y = 0, width = 12, height = 6,
+        properties = {
+          title  = "Requests (Invocations) + Errors",
+          region = var.aws_region,
+          metrics = concat(
+            [for fn in var.lambda_function_names : ["AWS/Lambda", "Invocations", "FunctionName", fn]],
+            [for fn in var.lambda_function_names : ["AWS/Lambda", "Errors", "FunctionName", fn]]
+          ),
+          stat = "Sum", period = 60
+        }
+      },
+      {
+        type = "metric", x = 12, y = 0, width = 12, height = 6,
+        properties = {
+          title   = "Latency p95 (Duration)",
+          region  = var.aws_region,
+          metrics = [for fn in var.lambda_function_names : ["AWS/Lambda", "Duration", "FunctionName", fn]],
+          stat    = "p95", period = 300
+        }
+      },
+      {
+        type = "metric", x = 0, y = 6, width = 12, height = 6,
+        properties = {
+          title   = "Max Memory Used (MB)",
+          region  = var.aws_region,
+          metrics = [for fn in var.lambda_function_names : ["VOD/lambda-${fn}", "MaxMemoryUsedMB"]],
+          stat    = "Maximum", period = 300
+        }
+      },
+      {
+        type = "metric", x = 12, y = 6, width = 12, height = 6,
+        properties = {
+          title  = "CloudFront traffic + 5xx",
+          region = "us-east-1",
+          metrics = [
+            ["AWS/CloudFront", "BytesDownloaded", "DistributionId", var.cloudfront_distribution_id, "Region", "Global"],
+            ["AWS/CloudFront", "5xxErrorRate", "DistributionId", var.cloudfront_distribution_id, "Region", "Global"]
+          ],
+          stat = "Sum", period = 300
+        }
+      }
+    ]
+  })
+}
