@@ -125,12 +125,17 @@ resource "aws_batch_job_definition" "this" {
       { name = "STORAGE_BUCKET", value = var.storage_bucket_name },
       { name = "STORAGE_PROVIDER", value = "s3" },
       { name = "AWS_REGION", value = var.aws_region },
+      # Persistência passa pelo Event Gateway (ingest), único escritor da coleção
+      # `videos`. O job NÃO fala Mongo direto; por isso não há secret MONGODB_URI.
+      { name = "EVENT_GATEWAY_URL", value = var.event_gateway_url },
     ]
 
+    # Os nomes dos env vars batem com config.FromEnv() do serviço, que lê
+    # AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY para o provider s3 (o minio-go usa
+    # creds estáticas). Os nomes dos parâmetros SSM permanecem S3_*.
     secrets = [
-      { name = "MONGODB_URI", valueFrom = "${var.ssm_parameter_prefix}/MONGODB_URI" },
-      { name = "S3_ACCESS_KEY_ID", valueFrom = "${var.ssm_parameter_prefix}/S3_ACCESS_KEY_ID" },
-      { name = "S3_SECRET_ACCESS_KEY", valueFrom = "${var.ssm_parameter_prefix}/S3_SECRET_ACCESS_KEY" },
+      { name = "AWS_ACCESS_KEY_ID", valueFrom = "${var.ssm_parameter_prefix}/S3_ACCESS_KEY_ID" },
+      { name = "AWS_SECRET_ACCESS_KEY", valueFrom = "${var.ssm_parameter_prefix}/S3_SECRET_ACCESS_KEY" },
     ]
 
     logConfiguration = {

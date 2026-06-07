@@ -144,33 +144,35 @@ cd -
 
 ## Pendências fora do IaC (precisam de código nos serviços)
 
-### P1 — `streaming-transcode`: `cmd/transcode-local` precisa rodar como job Batch
+### P1 — `streaming-transcode`: `cmd/transcode-local` como job Batch — ✅ IMPLEMENTADO (2026-06-07)
+
 **Por quê:** o trigger é `S3 ObjectCreated(raw/) → EventBridge → Batch SubmitJob`, e o job
-roda `transcode-local Ref::s3_key`. Hoje `transcode-local` é um utilitário de transcode
-local; ele precisa virar o entrypoint do job.
+roda `transcode-local Ref::s3_key`. `transcode-local` virou o entrypoint do job (mantendo o
+modo local-file por flags para dev).
 
-**Implementação esperada:**
-1. **Argumento:** ler `argv[1]` = a key do S3, no formato `raw/{video_id}/original.<ext>`.
-   Extrair `video_id` do path.
-2. **Config (env do Batch):** `STORAGE_BUCKET`, `AWS_REGION`, e as secrets injetadas pelo
-   Batch a partir do SSM — `MONGODB_URI`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`
-   (nomes definidos em `transcode-batch/main.tf` → `container_properties.secrets`).
-3. **Download:** baixar `s3://$STORAGE_BUCKET/<argv[1]>` para `TRANSCODE_WORKDIR` (`/tmp/transcode`).
-4. **Pipeline:** rodar a escada de bitrate **completa** (360/480/720/**1080**, sem teto —
-   decisão D11) com **GOPs alinhados** (`-g 60 -keyint_min 60 -sc_threshold 0`) + shaka-packager
-   → segmentos HLS/DASH + manifests.
-5. **Upload:** enviar para `s3://$STORAGE_BUCKET/transcoded/{video_id}/...` e
-   `manifests/{video_id}.m3u8` / `.mpd`.
-6. **MongoDB (crítico — distribution é read-only e não consome fila):**
-   - `transcoding_jobs`: `updateOne({video_id}, {$set:{status:"completed", completed_at}})`.
-   - `manifests`: `insert/update {video_id, hls_url, dash_url}` apontando para as keys/paths
-     em `transcoded/`/`manifests/` que o `streaming-distribution` transforma em URL
-     presigned/CDN no GET. Conferir o schema que o distribution lê (coleção `manifests`).
-7. **Exit code:** `0` em sucesso (Batch marca SUCCEEDED), ≠0 em falha (Batch marca FAILED →
-   reprocessável). Logs vão para o CloudWatch group `/vod/prod/transcode`.
+**Como ficou (ver `streaming-transcode/docs/batch-entrypoint.md`):**
+1. **Argumento:** `argv[1]` = a key do S3 no formato `raw/{video_id}/{object}` (o nome do
+   objeto é o filename normalizado do upload, não necessariamente `original.<ext>`).
+   `extractVideoID` deriva o `video_id`.
+2. **Config (env do Batch):** `STORAGE_PROVIDER=s3`, `STORAGE_BUCKET`, `AWS_REGION`,
+   `EVENT_GATEWAY_URL` (Function URL do ingest + `/api/v1`), e as secrets de S3 do SSM
+   mapeadas para `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` (params SSM continuam `S3_*`).
+   **Sem `MONGODB_URI`** — o job não fala Mongo.
+3. **Download → pipeline → upload:** reusa `worker.Processor.Process` inteiro — escada
+   **completa** (360/480/720/**1080**, sem teto, D11), GOPs alinhados + shaka-packager,
+   upload de HLS/DASH para `transcoded/{video_id}/...`.
+4. **Persistência via Event Gateway (não Mongo direto):** o `Processor` chama o ingest
+   (`PATCH /api/v1/upload-state/videos/:id` + eventos em `POST /api/v1/events`). O ingest é
+   o **escritor único** da coleção `videos` que o `streaming-distribution` lê. **Não existe
+   coleção `manifests`** — a suposição original deste runbook estava incorreta.
+5. **Exit code:** `0` SUCCEEDED, ≠0 FAILED (reprocessável). Logs no CloudWatch group do Batch.
 
-> O `cmd/worker` (consumer de RabbitMQ) deixa de ser o caminho de produção do transcode,
-> mas pode permanecer para dev local. Atualizar `SPEC.md`/`CHANGELOG.md`/`docs/` do serviço.
+**Mudanças de infra aplicadas (ver `infra/CHANGELOG.md`):** `transcode-batch` dropou o secret
+`MONGODB_URI`, ganhou `EVENT_GATEWAY_URL` (var `event_gateway_url`, wired no root para
+`${module.ingest_lambda.function_url}api/v1`), e corrigiu o nome dos env de credencial S3.
+
+> Caveats v1: modo Batch **não** anuncia legendas sidecar e **rejeita `.yuv`** (sem geometria
+> no evento S3). O `cmd/worker` (RabbitMQ) permanece só para dev local.
 
 ### P2 — `streaming-platform-upload` (Vercel): URL do ingest
 Se a função ingest for **recriada** (caso `PackageType=Zip`, Fase 2 passo 10), a Function URL

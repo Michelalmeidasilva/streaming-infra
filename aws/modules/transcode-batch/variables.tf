@@ -24,6 +24,11 @@ variable "ssm_parameter_prefix" {
   description = "Prefixo SSM, ex: /vod/prod"
 }
 
+variable "event_gateway_url" {
+  type        = string
+  description = "Base URL do Event Gateway (ingest) que o job usa para persistir o resultado, incluindo o sufixo /api/v1. Ex: https://<id>.lambda-url.us-east-2.on.aws/api/v1"
+}
+
 variable "ssm_parameter_arns" {
   type = list(string)
 }
