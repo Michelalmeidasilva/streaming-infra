@@ -1,3 +1,9 @@
+## [Unreleased] 2026-06-07 — transcode Batch job: persist via Event Gateway
+### Changed
+- `modules/transcode-batch`: the job now persists results through the **Event Gateway** (ingest) instead of MongoDB. Dropped the `MONGODB_URI` secret; added `EVENT_GATEWAY_URL` env (new `event_gateway_url` variable), wired in root `main.tf` to `${module.ingest_lambda.function_url}api/v1`. This keeps `streaming-ingest` as the single writer of the `videos` collection that `streaming-distribution` reads (there is no `manifests` collection).
+### Fixed
+- `modules/transcode-batch`: S3 credential secrets were injected as `S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY`, but the service's `config.FromEnv()` reads `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` for the `s3` provider (falling back to MinIO dev defaults otherwise). Renamed the injected **env var** names to match; the SSM parameter names stay `S3_*`. Without this the Batch job would have failed S3 auth.
+
 ## [Unreleased] 2026-06-07
 ### Fixed
 - emf-forwarder: stop the busy-loop when a target container is stopped (not removed). `containers.get()` still returns a stopped container, so `logs(follow=True)` yielded an already-closed stream and the `while True` re-tailed with no backoff (only the NotFound/exception paths slept). Now skips non-`running` containers and backs off after a normal stream close, polling at 3s instead of hot-spinning.

@@ -83,6 +83,9 @@ module "transcode_batch" {
   ssm_parameter_prefix = module.ssm_secrets.parameter_prefix
   ssm_parameter_arns   = module.ssm_secrets.parameter_arns
   aws_region           = var.aws_region
+  # Function URL do ingest termina em "/"; o serviço posta em <base>/events e
+  # <base>/upload-state/videos/:id, então a base inclui o sufixo /api/v1.
+  event_gateway_url = "${module.ingest_lambda.function_url}api/v1"
 }
 
 # 9. EventBridge: S3→Batch (transcode) + S3→ingest (API Destination).
