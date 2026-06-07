@@ -62,6 +62,13 @@ def tail(name):
     while True:
         try:
             c = dclient.containers.get(name)
+            if c.status != "running":
+                # Container exists but is stopped/exited: logs(follow=True) returns an
+                # already-closed stream that ends immediately. Without this guard the
+                # while-loop hot-spins (the normal-close path below has no backoff and
+                # neither except branch fires). Poll quietly until the target runs again.
+                time.sleep(3)
+                continue
             print(f"[emf-forwarder] tailing {name}", flush=True)
             for raw in c.logs(stream=True, follow=True, tail=0):
                 line = raw.decode("utf-8", "replace").strip()
@@ -71,6 +78,9 @@ def tail(name):
                     emit(json.loads(line))
                 except json.JSONDecodeError:
                     pass
+            # Stream closed normally (target stopped while we were following): back off
+            # before re-tailing so a freshly stopped container does not spin.
+            time.sleep(3)
         except docker.errors.NotFound:
             time.sleep(3)
         except Exception as e:  # noqa: BLE001
