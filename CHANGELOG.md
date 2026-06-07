@@ -1,3 +1,7 @@
+## [Unreleased] 2026-06-07 — dev compose: enable E2E auth on the upload service
+### Changed
+- `docker-compose.yml`: set `E2E_AUTH_ENABLED=1` and `E2E_ADMIN_EMAIL=admin@local.dev` on `streaming-platform-upload`, matching the client build args (`NEXT_PUBLIC_E2E_*`). The server-side bypass was off, so the dockerized upload UI could not authenticate (Google OAuth is the only other provider). Paired with the `e2e.ts` fix in the upload service (the gate no longer depends on the build-frozen `NODE_ENV`). Dev/local only.
+
 ## [Unreleased] 2026-06-07 — transcode Batch job: persist via Event Gateway
 ### Changed
 - `modules/transcode-batch`: the job now persists results through the **Event Gateway** (ingest) instead of MongoDB. Dropped the `MONGODB_URI` secret; added `EVENT_GATEWAY_URL` env (new `event_gateway_url` variable), wired in root `main.tf` to `${module.ingest_lambda.function_url}api/v1`. This keeps `streaming-ingest` as the single writer of the `videos` collection that `streaming-distribution` reads (there is no `manifests` collection).
