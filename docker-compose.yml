@@ -165,15 +165,17 @@ services:
       # host-published URL, since the browser cannot resolve the `minio` DNS name.
       MINIO_PUBLIC_ENDPOINT: http://localhost:9000
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      # Enable the E2E auth bypass server-side to match the client build args
+      # (NEXT_PUBLIC_E2E_* are baked at build time above). The guard in
+      # lib/auth/e2e.ts still blocks this when NODE_ENV=production at runtime, so
+      # it only applies to this local/dev stack. Sign in / cookie email is
+      # admin@local.dev → ADMIN.
+      E2E_AUTH_ENABLED: "1"
+      E2E_ADMIN_EMAIL: admin@local.dev
       # STORAGE_PROVIDER: minio
       # STORAGE_BUCKET: videos
       # MINIO_ACCESS_KEY: admin
       # MINIO_SECRET_KEY: password123
-      # E2E_AUTH_ENABLED: "1"
-      # NEXT_PUBLIC_E2E_AUTH_ENABLED: "1"
-      # E2E_ADMIN_EMAIL: admin@local.dev
-      # NEXT_PUBLIC_E2E_ADMIN_EMAIL: admin@local.dev
-      # ADMIN_EMAILS: admin@local.dev
     depends_on:
       - streaming-ingest
       - minio
