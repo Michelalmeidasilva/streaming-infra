@@ -164,6 +164,7 @@ services:
       # Browser-facing base for object URLs (e.g. thumbnails). Must be the
       # host-published URL, since the browser cannot resolve the `minio` DNS name.
       MINIO_PUBLIC_ENDPOINT: http://localhost:9000
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       # STORAGE_PROVIDER: minio
       # STORAGE_BUCKET: videos
       # MINIO_ACCESS_KEY: admin
