@@ -1,3 +1,7 @@
+## [Unreleased] 2026-06-07
+### Fixed
+- emf-forwarder: stop the busy-loop when a target container is stopped (not removed). `containers.get()` still returns a stopped container, so `logs(follow=True)` yielded an already-closed stream and the `while True` re-tailed with no backoff (only the NotFound/exception paths slept). Now skips non-`running` containers and backs off after a normal stream close, polling at 3s instead of hot-spinning.
+
 ## [Unreleased] 2026-06-06
 ### Added
 - Dev observability via moto (OSS CloudWatch emulator) + emf-forwarder sidecar + Grafana CloudWatch datasource.
