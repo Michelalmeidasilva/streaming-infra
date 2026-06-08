@@ -47,6 +47,11 @@ resource "aws_lambda_function" "this" {
       # s3_adapter lê as três do ambiente, então o acesso S3 usa a role abaixo.
       CACHE_TTL   = "300"
       PRESIGN_TTL = "900"
+      # Playback no browser exige modo CDN: presigned assina só o master.m3u8, e as
+      # playlists/segmentos filhos (URL relativa) dariam 403 no bucket privado. Com CDN_BASE
+      # o URLBuilder devolve URLs públicas do CloudFront (mesma distribution, behaviors
+      # transcoded/* e thumbnails/* → origem S3 via OAC), e os filhos relativos resolvem.
+      CDN_BASE = "https://${aws_cloudfront_distribution.this.domain_name}"
     }
   }
 }
@@ -109,6 +114,19 @@ locals {
   origin_domain = replace(aws_apigatewayv2_api.this.api_endpoint, "https://", "")
 }
 
+# Bucket de mídia (segmentos/manifests transcodados). Usado como 2ª origem do CloudFront.
+data "aws_s3_bucket" "storage" {
+  bucket = var.storage_bucket_name
+}
+
+# OAC (tipo s3): só o CloudFront lê o bucket privado; o viewer recebe URLs públicas.
+resource "aws_cloudfront_origin_access_control" "media" {
+  name                              = "${var.function_name}-media-oac"
+  origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+}
+
 resource "aws_cloudfront_distribution" "this" {
   enabled         = true
   price_class     = "PriceClass_100"
@@ -124,6 +142,13 @@ resource "aws_cloudfront_distribution" "this" {
       origin_protocol_policy = "https-only"
       origin_ssl_protocols   = ["TLSv1.2"]
     }
+  }
+
+  # 2ª origem: bucket S3 de mídia (OAC). Serve transcoded/* e thumbnails/* publicamente.
+  origin {
+    domain_name              = data.aws_s3_bucket.storage.bucket_regional_domain_name
+    origin_id                = "distribution-media-s3"
+    origin_access_control_id = aws_cloudfront_origin_access_control.media.id
   }
 
   default_cache_behavior {
@@ -144,6 +169,28 @@ resource "aws_cloudfront_distribution" "this" {
     origin_request_policy_id = "b689b0a8-53d0-40ab-baf2-68738e2966ac" # Managed-AllViewerExceptHostHeader
   }
 
+  # Mídia transcodada → origem S3. CachingOptimized (segmentos imutáveis) + SimpleCORS
+  # (ACAO no edge p/ o player do web-client buscar playlists/segmentos cross-origin).
+  ordered_cache_behavior {
+    path_pattern               = "transcoded/*"
+    target_origin_id           = "distribution-media-s3"
+    viewer_protocol_policy     = "redirect-to-https"
+    allowed_methods            = ["GET", "HEAD", "OPTIONS"]
+    cached_methods             = ["GET", "HEAD"]
+    cache_policy_id            = "658327ea-f89d-4fab-a63d-7e88639e58f6" # Managed-CachingOptimized
+    response_headers_policy_id = "60669652-455b-4ae9-85a4-c4c02393f86c" # Managed-SimpleCORS
+  }
+
+  ordered_cache_behavior {
+    path_pattern               = "thumbnails/*"
+    target_origin_id           = "distribution-media-s3"
+    viewer_protocol_policy     = "redirect-to-https"
+    allowed_methods            = ["GET", "HEAD", "OPTIONS"]
+    cached_methods             = ["GET", "HEAD"]
+    cache_policy_id            = "658327ea-f89d-4fab-a63d-7e88639e58f6" # Managed-CachingOptimized
+    response_headers_policy_id = "60669652-455b-4ae9-85a4-c4c02393f86c" # Managed-SimpleCORS
+  }
+
   restrictions {
     geo_restriction {
       restriction_type = "none"
@@ -153,4 +200,28 @@ resource "aws_cloudfront_distribution" "this" {
   viewer_certificate {
     cloudfront_default_certificate = true
   }
+}
+
+# Bucket policy: só este CloudFront (via OAC) lê o bucket. Não é "público" (principal de
+# serviço + SourceArn), então passa pelo Block Public Access do bucket.
+data "aws_iam_policy_document" "media_oac_read" {
+  statement {
+    sid       = "AllowCloudFrontOACRead"
+    actions   = ["s3:GetObject"]
+    resources = ["${data.aws_s3_bucket.storage.arn}/*"]
+    principals {
+      type        = "Service"
+      identifiers = ["cloudfront.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceArn"
+      values   = [aws_cloudfront_distribution.this.arn]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "media_oac" {
+  bucket = data.aws_s3_bucket.storage.id
+  policy = data.aws_iam_policy_document.media_oac_read.json
 }
