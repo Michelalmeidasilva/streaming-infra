@@ -1,3 +1,43 @@
+## [Unreleased] 2026-06-08 — deploy real: Function URL pública bloqueada → API Gateway
+### Changed
+- `modules/ingest-lambda`: substituída a Function URL por **API Gateway HTTP API**
+  ($default stage, integração AWS_PROXY). A conta AWS (limitada/nova, concurrency=10)
+  bloqueia Function URL pública (`auth NONE` → 403), e o ingest tem chamadores externos
+  sem credencial AWS (Vercel, EventBridge API Destination). Output `function_url` agora
+  é a invoke_url do stage (com `/` final via `trimsuffix`).
+- `modules/distribution-lambda`: CloudFront agora aponta para **API Gateway HTTP API**
+  (não mais Function URL). Tentativa anterior com CloudFront OAC + Function URL `AWS_IAM`
+  retornava 403 (OAC→Lambda não autentica neste ambiente), então removida. Env reservadas
+  `AWS_ACCESS_KEY_ID/SECRET` saíram do Lambda (são injetadas pela execution role); adicionada
+  policy `s3:GetObject/ListBucket` na role para o presign.
+- `streaming-distribution/internal/adapters/s3_adapter.go`: `NewStaticV4` passou a incluir
+  `AWS_SESSION_TOKEN` (creds temporárias da role no Lambda; token vazio no Batch/local).
+### Fixed
+- `modules/cost-guard/sns.tf`: policy de tópico SNS apontava para os DOIS ARNs num único
+  documento compartilhado → `InvalidParameter: Policy statement must apply to a single
+  resource!`. Separado em um documento escopado por tópico.
+### Notes
+- Imagens das Lambdas devem ser buildadas com `--provenance=false --sbom=false` (buildkit
+  do Docker 29 anexa attestation/OCI index → `media type not supported` no CreateFunction).
+- Pendência: atualizar a env do ingest na Vercel para a nova URL do API Gateway.
+
+## [Unreleased] 2026-06-08
+### Added
+- Cost guard: budgets mensal ($40) + diário ($3) → SNS → Lambda kill-switch que
+  faz soft-stop reversível (zera concorrência das Lambdas, desabilita regras
+  EventBridge, desabilita Batch queue + termina jobs, desabilita CloudFront).
+  Re-arm manual via `aws/scripts/cost-guard-rearm.sh`. Módulo `cost-guard`
+  (provider us-east-1, pois Budgets é global). Ver `docs/cost-guard.md`.
+
+## [Unreleased] 2026-06-07 — docs: detailed deploy step-by-step
+### Added
+- `aws/DEPLOY-PASSO-A-PASSO.md`: granular operator guide (Fase 0→4 + apêndices) to provision the stack from scratch — each step as Comando → Saída esperada → Checkpoint, marking 🟢 read-only vs 🔴 mutating steps. Companion to `aws/RUNBOOK.md` (phase overview) and `docs/architecture.md` (diagram). Covers bootstrap state, tfvars placeholders, bucket/ingest import decisions (Image vs Zip), ECR build/push gate, Ansible broker+web-client, E2E smoke, rollback/destroy and re-deploy.
+
+## [Unreleased] 2026-06-07 — docs: full deploy architecture diagram
+### Added
+- `docs/architecture.md`: end-to-end Mermaid diagram of the cloud topology (AWS us-east-2 + external managed services) covering the upload → EventBridge → Batch transcode → ingest → distribution → CloudFront flow, plus E2E legend and boundaries. Companion view to `aws/RUNBOOK.md`.
+- `aws/terraform.tfvars` (git-ignored): generated from `terraform.tfvars.example` with explicit `<PREENCHER-*>` placeholders for the real bucket name and the three external service URLs (Atlas / CloudAMQP / Redis).
+
 ## [Unreleased] 2026-06-07 — dev compose: enable E2E auth on the upload service
 ### Changed
 - `docker-compose.yml`: set `E2E_AUTH_ENABLED=1` and `E2E_ADMIN_EMAIL=admin@local.dev` on `streaming-platform-upload`, matching the client build args (`NEXT_PUBLIC_E2E_*`). The server-side bypass was off, so the dockerized upload UI could not authenticate (Google OAuth is the only other provider). Paired with the `e2e.ts` fix in the upload service (the gate no longer depends on the build-frozen `NODE_ENV`). Dev/local only.

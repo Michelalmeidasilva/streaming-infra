@@ -1,5 +1,6 @@
 output "function_url" {
-  value = aws_lambda_function_url.this.function_url
+  description = "Base do API Gateway HTTP API do distribution (origem do CloudFront)."
+  value       = aws_apigatewayv2_api.this.api_endpoint
 }
 
 output "cdn_domain" {
