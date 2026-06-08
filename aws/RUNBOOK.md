@@ -201,3 +201,12 @@ a URL é preservada.
 **CI/CD via GitHub Actions + OIDC:** assumir uma IAM Role federada (sem chave AWS no repo),
 rodar `terraform plan` no PR e `apply` no merge; encadear os playbooks Ansible. Bootstrap:
 criar o OIDC provider + Role. Ver `infra/ansible/README.md` e o spec.
+
+## Cost Guard (kill-switch por budget)
+
+Aplicado junto com o `terraform apply` do stack. Após o primeiro apply:
+1. Confirme as 2 subscriptions de e-mail do SNS (link nos e-mails de confirmação).
+2. Verifique os budgets no console (Billing → Budgets): `vod-prod-monthly` ($40),
+   `vod-prod-daily` ($3).
+3. Recuperação após disparo: `DIST_IDS="<ids>" bash aws/scripts/cost-guard-rearm.sh`.
+Detalhes e limitações: `infra/docs/cost-guard.md`.
