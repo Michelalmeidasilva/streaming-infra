@@ -5,6 +5,15 @@ mongodb_uri  = "mongodb+srv://user:pass@cluster.mongodb.net/streaming"
 rabbitmq_url = "amqps://user:pass@host.cloudamqp.com/vhost"
 redis_url    = "rediss://user:pass@host:6379"
 
+# --- Origens de browser autorizadas a upload presigned direto no bucket S3 ---
+# Em prod INCLUA o domínio da Vercel, senão o preflight CORS do S3 retorna 403 no PUT.
+# Sem esta chave aplica-se o default (só localhost) de modules/storage-s3/variables.tf.
+cors_allowed_origins = [
+  "https://streaming-platform-upload.vercel.app",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+]
+
 # --- Cost guard (kill-switch por budget) ---
 monthly_limit_usd = 40
 daily_limit_usd   = 3

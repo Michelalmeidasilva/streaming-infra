@@ -47,11 +47,11 @@ edge do CloudFront nem pelo API Gateway. Cadeia de evidências:
 
 ## Correção
 
-Anexar a managed origin request policy **CORS-CustomOrigin**
-(`59781a5b-3903-41f3-afcb-af62929ccde1`) ao `default_cache_behavior`. Ela encaminha
-`Origin` + `Access-Control-Request-Method` + `Access-Control-Request-Headers` e **não**
-encaminha `Host` (preservando o roteamento do API Gateway). Com os headers chegando, o
-middleware CORS já existente no Fiber responde o preflight com `204` e devolve
+Anexar a managed origin request policy **AllViewerExceptHostHeader**
+(`b689b0a8-53d0-40ab-baf2-68738e2966ac`) ao `default_cache_behavior`. Ela encaminha todos
+os headers do viewer (`Origin`, `Access-Control-Request-Method/Headers`, `x-api-key`)
+**exceto** `Host` — preservando o roteamento do API Gateway. Com os headers de preflight
+chegando, o middleware CORS já existente no Fiber responde o `OPTIONS` com `204` e devolve
 `Access-Control-Allow-Methods: GET,OPTIONS` / `Access-Control-Allow-Headers:
 X-API-Key,Content-Type` (configurados em `cmd/api/main.go` da distribution).
 
@@ -59,9 +59,15 @@ X-API-Key,Content-Type` (configurados em `cmd/api/main.go` da distribution).
 default_cache_behavior {
   # ...
   cache_policy_id          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # CachingDisabled
-  origin_request_policy_id = "59781a5b-3903-41f3-afcb-af62929ccde1" # Managed-CORS-CustomOrigin
+  origin_request_policy_id = "b689b0a8-53d0-40ab-baf2-68738e2966ac" # Managed-AllViewerExceptHostHeader
 }
 ```
+
+> **Não use `CORS-CustomOrigin` (`59781a5b-...`) aqui.** Apesar do nome, nesta conta essa
+> managed policy só encaminha o header `origin` (verificado via
+> `aws cloudfront get-origin-request-policy`), então o `Access-Control-Request-Method` não
+> chega ao Fiber e o `405` persiste. `AllViewer` também serve, mas encaminha `Host`, o que
+> quebra o API Gateway — por isso `AllViewerExceptHostHeader`.
 
 ### Alternativa considerada
 

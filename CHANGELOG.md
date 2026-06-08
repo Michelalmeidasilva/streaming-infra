@@ -1,15 +1,24 @@
-## [Unreleased] 2026-06-08 — fix: preflight CORS 405 na distribution (CloudFront não repassava headers)
+## [Unreleased] 2026-06-08 — fix: preflight CORS 405 (distribution) e 403 no upload (bucket S3)
 ### Fixed
 - `modules/distribution-lambda`: adicionada a managed origin request policy
-  **CORS-CustomOrigin** (`59781a5b-3903-41f3-afcb-af62929ccde1`) ao `default_cache_behavior`
-  do CloudFront. Sem ela, o CloudFront não encaminhava `Access-Control-Request-Method`/
-  `Access-Control-Request-Headers` para a origem; o middleware CORS do Fiber
-  (`gofiber/fiber v2.52.13`) não classificava o `OPTIONS` como preflight, caía no router
-  (só `GET`/`HEAD`) e devolvia **`405 Allow: GET, HEAD`**, fazendo o navegador bloquear o
-  `GET` cross-site do `streaming-web-client` (`d3fl4gu1sp7re2` → `d2qy6ma0p8fdhs`,
-  `GET /api/v1/videos` com header custom `x-api-key`). A policy encaminha os headers de
-  preflight (sem `Host`, preservando o API Gateway), deixando o Fiber responder `204`.
-  Diagnóstico em `docs/cors-preflight-405-distribution.md`.
+  **AllViewerExceptHostHeader** (`b689b0a8-53d0-40ab-baf2-68738e2966ac`) ao
+  `default_cache_behavior` do CloudFront. Sem origin request policy o CloudFront não
+  encaminhava `Access-Control-Request-Method`/`Headers` para a origem; o middleware CORS do
+  Fiber (`gofiber/fiber v2.52.13`) não classificava o `OPTIONS` como preflight, caía no
+  router (só `GET`/`HEAD`) e devolvia **`405 Allow: GET, HEAD`**, fazendo o navegador
+  bloquear o `GET` cross-site do `streaming-web-client` (`d3fl4gu1sp7re2` → `d2qy6ma0p8fdhs`,
+  `GET /api/v1/videos` com header custom `x-api-key`). ATENÇÃO: a managed `CORS-CustomOrigin`
+  nesta conta só encaminha `origin` (verificado via `get-origin-request-policy`), então NÃO
+  resolve — por isso usamos `AllViewerExceptHostHeader` (encaminha tudo menos `Host`,
+  preservando o roteamento do API Gateway). Diagnóstico em
+  `docs/cors-preflight-405-distribution.md`.
+- `modules/storage-s3` + `terraform.tfvars`: `cors_allowed_origins` estava comentado no
+  tfvars, então o bucket `vod-storage-2026` aplicava só o default (`localhost:3000`/`127.*`).
+  O upload de produção (`https://streaming-platform-upload.vercel.app`) fazia PUT presigned
+  cross-origin → preflight `OPTIONS` do S3 retornava **`403`** (origem não permitida) e o
+  navegador bloqueava o PUT (a presigned URL em si é válida — `curl PUT` retorna `200`).
+  Adicionado o domínio Vercel ao `cors_allowed_origins`. Diagnóstico em
+  `docs/cors-s3-upload-403.md`.
 
 ## [Unreleased] 2026-06-08 — deploy real: Function URL pública bloqueada → API Gateway
 ### Changed
