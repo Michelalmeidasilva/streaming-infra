@@ -34,7 +34,9 @@ resource "aws_lambda_function" "this" {
 
   environment {
     variables = {
-      STORAGE_PROVIDER  = "s3"
+      # O distribution seleciona o S3Adapter só com "aws-s3" (cmd/api/main.go); com "s3"
+      # caía no MinioAdapter → client nil → presign "storage client not initialized" → 500.
+      STORAGE_PROVIDER  = "aws-s3"
       STORAGE_BUCKET    = var.storage_bucket_name
       TRANSCODED_PREFIX = "transcoded"
       AWS_LWA_PORT      = "8082"

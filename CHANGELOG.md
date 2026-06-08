@@ -1,3 +1,18 @@
+## [Unreleased] 2026-06-08 — fix: manifest 500 (STORAGE_PROVIDER mismatch) no distribution
+### Fixed
+- `modules/distribution-lambda`: `STORAGE_PROVIDER` era `"s3"`, mas o distribution
+  (`cmd/api/main.go`) só seleciona o `S3Adapter` com `"aws-s3"` — com `"s3"` caía no
+  `MinioAdapter`, que lê `MINIO_ENDPOINT` (inexistente no Lambda) → `client: nil` →
+  `GET /api/v1/manifest/:id` retornava **500 "failed to resolve manifest"** (log:
+  `presign hls: storage client not initialized`). O catálogo (`/videos`) funcionava porque
+  não presigna. Corrigido para `STORAGE_PROVIDER = "aws-s3"`. Manifest agora responde 200
+  com URLs presigned.
+### Known issue (próximo passo)
+- Playback no browser ainda falha: o distribution está em modo presigned (sem `CDN_BASE`),
+  que assina só o `master.m3u8`; as playlists/segmentos filhos são buscados por URL relativa
+  e dão **403** no bucket privado. Conforme `streaming-distribution/SPEC.md`, playback exige
+  modo CDN. Falta um CloudFront (OAC) servindo `transcoded/` + `CDN_BASE` apontando p/ ele.
+
 ## [Unreleased] 2026-06-08 — fix: preflight CORS 405 (distribution) e 403 no upload (bucket S3)
 ### Fixed
 - `modules/distribution-lambda`: adicionada a managed origin request policy
