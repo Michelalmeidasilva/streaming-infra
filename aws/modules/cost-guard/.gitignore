@@ -1,0 +1,4 @@
+build/
+lambda/.venv/
+lambda/__pycache__/
+lambda/.pytest_cache/

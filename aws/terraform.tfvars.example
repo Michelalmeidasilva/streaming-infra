@@ -4,3 +4,8 @@ storage_bucket_name = "PREENCHER-com-o-nome-do-bucket-existente"
 mongodb_uri  = "mongodb+srv://user:pass@cluster.mongodb.net/streaming"
 rabbitmq_url = "amqps://user:pass@host.cloudamqp.com/vhost"
 redis_url    = "rediss://user:pass@host:6379"
+
+# --- Cost guard (kill-switch por budget) ---
+monthly_limit_usd = 40
+daily_limit_usd   = 3
+alert_email       = "voce@exemplo.com"
