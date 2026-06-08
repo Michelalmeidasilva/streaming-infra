@@ -127,6 +127,28 @@ resource "aws_cloudfront_origin_access_control" "media" {
   signing_protocol                  = "sigv4"
 }
 
+# Responde o preflight CORS (OPTIONS) da mídia no edge. Necessária porque o player injeta
+# o header custom `x-api-key` em toda request → preflight; e o S3 (OAC) recusa o OPTIONS
+# assinado (403). Ver media_cors.js. Fix de raiz seria o web-client não mandar x-api-key
+# em recursos do CDN, mas isso resolve no edge sem redeploy do web-client.
+resource "aws_cloudfront_function" "media_cors" {
+  name    = "${var.function_name}-media-cors"
+  runtime = "cloudfront-js-2.0"
+  comment = "Answer CORS preflight (OPTIONS) for media behaviors at the edge"
+  publish = true
+  code    = file("${path.module}/media_cors.js")
+}
+
+# viewer-response: injeta ACAO no GET/HEAD da mídia. A SimpleCORS não aplica o ACAO quando
+# o player manda o header custom x-api-key; aqui é determinístico. Ver media_cors_response.js.
+resource "aws_cloudfront_function" "media_cors_response" {
+  name    = "${var.function_name}-media-cors-resp"
+  runtime = "cloudfront-js-2.0"
+  comment = "Inject access-control-allow-origin on media responses"
+  publish = true
+  code    = file("${path.module}/media_cors_response.js")
+}
+
 resource "aws_cloudfront_distribution" "this" {
   enabled         = true
   price_class     = "PriceClass_100"
@@ -169,26 +191,43 @@ resource "aws_cloudfront_distribution" "this" {
     origin_request_policy_id = "b689b0a8-53d0-40ab-baf2-68738e2966ac" # Managed-AllViewerExceptHostHeader
   }
 
-  # Mídia transcodada → origem S3. CachingOptimized (segmentos imutáveis) + SimpleCORS
-  # (ACAO no edge p/ o player do web-client buscar playlists/segmentos cross-origin).
+  # Mídia transcodada → origem S3. CachingOptimized (segmentos imutáveis). O CORS é feito
+  # nas CloudFront Functions (preflight no viewer-request, ACAO no viewer-response): a
+  # SimpleCORS não aplica o ACAO quando o player manda o header custom x-api-key.
   ordered_cache_behavior {
-    path_pattern               = "transcoded/*"
-    target_origin_id           = "distribution-media-s3"
-    viewer_protocol_policy     = "redirect-to-https"
-    allowed_methods            = ["GET", "HEAD", "OPTIONS"]
-    cached_methods             = ["GET", "HEAD"]
-    cache_policy_id            = "658327ea-f89d-4fab-a63d-7e88639e58f6" # Managed-CachingOptimized
-    response_headers_policy_id = "60669652-455b-4ae9-85a4-c4c02393f86c" # Managed-SimpleCORS
+    path_pattern           = "transcoded/*"
+    target_origin_id       = "distribution-media-s3"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
+    cached_methods         = ["GET", "HEAD"]
+    cache_policy_id        = "658327ea-f89d-4fab-a63d-7e88639e58f6" # Managed-CachingOptimized
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.media_cors.arn
+    }
+    function_association {
+      event_type   = "viewer-response"
+      function_arn = aws_cloudfront_function.media_cors_response.arn
+    }
   }
 
   ordered_cache_behavior {
-    path_pattern               = "thumbnails/*"
-    target_origin_id           = "distribution-media-s3"
-    viewer_protocol_policy     = "redirect-to-https"
-    allowed_methods            = ["GET", "HEAD", "OPTIONS"]
-    cached_methods             = ["GET", "HEAD"]
-    cache_policy_id            = "658327ea-f89d-4fab-a63d-7e88639e58f6" # Managed-CachingOptimized
-    response_headers_policy_id = "60669652-455b-4ae9-85a4-c4c02393f86c" # Managed-SimpleCORS
+    path_pattern           = "thumbnails/*"
+    target_origin_id       = "distribution-media-s3"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
+    cached_methods         = ["GET", "HEAD"]
+    cache_policy_id        = "658327ea-f89d-4fab-a63d-7e88639e58f6" # Managed-CachingOptimized
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.media_cors.arn
+    }
+    function_association {
+      event_type   = "viewer-response"
+      function_arn = aws_cloudfront_function.media_cors_response.arn
+    }
   }
 
   restrictions {

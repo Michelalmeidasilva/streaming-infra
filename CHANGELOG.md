@@ -1,3 +1,19 @@
+## [Unreleased] 2026-06-08 — fix: CORS da mídia no edge (player manda x-api-key → 403)
+### Fixed
+- `modules/distribution-lambda`: o player (Shaka) injeta o header custom `x-api-key` em TODA
+  requisição, inclusive nos arquivos públicos do CDN. Isso (header custom + cross-origin)
+  disparava um **preflight CORS** na mídia; o S3 (via OAC) recusava o `OPTIONS` assinado →
+  **403** → vídeo não carregava. Além disso, a managed `SimpleCORS` **deixa de aplicar** o
+  `access-control-allow-origin` na resposta do GET quando o `x-api-key` está presente
+  (verificado: mesmo arquivo/MISS, sem header tem ACAO, com header não). Solução no edge com
+  2 CloudFront Functions nos behaviors `transcoded/*`/`thumbnails/*`: `media_cors.js`
+  (viewer-request → responde o preflight `OPTIONS` com 204) e `media_cors_response.js`
+  (viewer-response → injeta `access-control-allow-origin: *`). Removida a `SimpleCORS` dos
+  behaviors (o CORS passou a ser feito 100% nas functions, sem header duplicado). Verificado:
+  preflight 204, e master/child/segment GET com x-api-key = 200 + ACAO.
+  Fix de raiz (cleanup) seria o web-client não mandar `x-api-key` em recursos do CDN
+  (`packages/player/src/VodPlayer.ts` / `StoryPlayer.svelte`), eliminando o preflight.
+
 ## [Unreleased] 2026-06-08 — feat: playback de mídia via CloudFront/OAC (modo CDN do distribution)
 ### Added / Fixed
 - `modules/distribution-lambda`: adicionada 2ª origem S3 (OAC) ao CloudFront do distribution

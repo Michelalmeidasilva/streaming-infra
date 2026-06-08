@@ -49,6 +49,33 @@ O default behavior continua indo p/ o API Gateway (rotas `/api/*`, `/health`); s
 o CloudFront depende de `aws_apigatewayv2_api.this` (atributo `api_endpoint`, que não depende
 do Lambda) e do S3 — não do Lambda. Logo `lambda → cloudfront → {api, s3}` é acíclico.
 
+## CORS da mídia: player manda `x-api-key` (CloudFront Functions)
+
+Mesmo com a mídia no CDN, o playback ainda dava **403**. O player (Shaka, via
+`packages/player/src/VodPlayer.ts`) injeta o header custom `x-api-key` em **toda**
+requisição, inclusive nos arquivos públicos do CDN. Consequências:
+
+1. Header custom + cross-origin ⇒ o browser faz **preflight CORS** (`OPTIONS`) na mídia. O
+   S3 (via OAC) recusa o `OPTIONS` assinado → 403. Adicionar a origem ao CORS do bucket
+   **não** resolve (S3 não processa o preflight de requisição assinada por OAC — verificado).
+2. A managed `SimpleCORS` (response headers policy) **não aplica** o
+   `access-control-allow-origin` na resposta do GET quando o `x-api-key` está presente
+   (verificado: mesmo arquivo/MISS, sem o header tem `ACAO: *`, com o header não tem). Sem
+   ACAO na resposta real, o browser bloqueia mesmo com o preflight OK.
+
+**Fix (edge):** duas CloudFront Functions nos behaviors `transcoded/*`/`thumbnails/*`:
+- `media_cors.js` (viewer-request): se `OPTIONS`, responde `204` com os headers de CORS
+  (`access-control-allow-*`) — preflight resolvido no edge, sem tocar no S3.
+- `media_cors_response.js` (viewer-response): injeta `access-control-allow-origin: *` em todo
+  GET/HEAD (não roda na resposta gerada pelo preflight). Determinístico, independe do
+  x-api-key. A `SimpleCORS` foi removida dos behaviors (CORS 100% nas functions, sem ACAO
+  duplicado).
+
+**Fix de raiz (cleanup recomendado):** o web-client não deveria mandar `x-api-key` em
+recursos do CDN (só nas chamadas à API `/api/v1/*`). Hoje o filtro do Shaka adiciona o header
+em tudo. Removendo/escopando esse filtro, não há preflight nenhum e a `SimpleCORS` voltaria a
+bastar — mas exige rebuild+redeploy do web-client (repo separado).
+
 ## Caveats
 
 - **Cache do manifest (Redis, `CACHE_TTL=300`)**: após setar `CDN_BASE`, o manifest pode
