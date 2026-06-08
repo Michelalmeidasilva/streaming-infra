@@ -138,3 +138,31 @@ module "observability" {
 output "observability_dashboard" {
   value = module.observability.dashboard_name
 }
+
+# 12. Cost guard — budgets ($40/mês, $3/dia) → SNS → kill-switch Lambda (soft-stop).
+module "cost_guard" {
+  source    = "./modules/cost-guard"
+  providers = { aws = aws.us_east_1 }
+
+  environment   = var.environment
+  target_region = var.aws_region
+
+  monthly_limit_usd = var.monthly_limit_usd
+  daily_limit_usd   = var.daily_limit_usd
+  alert_email       = var.alert_email
+
+  lambda_function_names = ["streaming-ingest", "streaming-distribution"]
+  event_rule_names = [
+    module.events.s3_to_batch_rule_name,
+    module.events.s3_to_ingest_rule_name,
+  ]
+  batch_job_queue_name = module.transcode_batch.job_queue_name
+  cloudfront_distribution_ids = [
+    module.distribution_lambda.cdn_distribution_id,
+    module.web_client_cdn.cdn_distribution_id,
+  ]
+}
+
+output "cost_guard_killswitch_function" {
+  value = module.cost_guard.killswitch_function_name
+}

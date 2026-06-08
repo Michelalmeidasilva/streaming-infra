@@ -48,3 +48,21 @@ variable "redis_url" {
   description = "URL do Redis externo (cache existente)."
   sensitive   = true
 }
+
+# --- Cost guard (kill-switch por budget) ---
+variable "monthly_limit_usd" {
+  type        = number
+  description = "Teto mensal de gasto em USD (dispara kill-switch em 100% actual)."
+  default     = 40
+}
+
+variable "daily_limit_usd" {
+  type        = number
+  description = "Teto diário de gasto em USD (dispara kill-switch em 100% actual)."
+  default     = 3
+}
+
+variable "alert_email" {
+  type        = string
+  description = "E-mail que recebe alertas de budget e confirmação do kill-switch."
+}
