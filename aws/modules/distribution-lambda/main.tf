@@ -131,6 +131,13 @@ resource "aws_cloudfront_distribution" "this" {
     cached_methods         = ["GET", "HEAD"]
     # Managed policy "CachingDisabled" como default; manifests usam TTL curto via app headers.
     cache_policy_id = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
+    # Sem origin request policy o CloudFront NÃO repassa os headers de preflight CORS
+    # (Access-Control-Request-Method/Headers) para a origem. O middleware CORS do Fiber
+    # então não reconhece o OPTIONS como preflight, cai no router (só GET/HEAD) e retorna
+    # 405 — quebrando o GET cross-site do web-client. A managed "CORS-CustomOrigin"
+    # encaminha Origin + Access-Control-Request-Method/Headers (e NÃO o Host, mantendo o
+    # API Gateway funcional), deixando o Fiber responder o preflight com 204.
+    origin_request_policy_id = "59781a5b-3903-41f3-afcb-af62929ccde1" # Managed-CORS-CustomOrigin
   }
 
   restrictions {

@@ -31,6 +31,13 @@ Verificado:
 - O output `function_url` de cada módulo passou a ser a invoke_url do stage (ingest com `/`
   final via `trimsuffix`), então o wiring downstream (events API Destination, Batch
   `EVENT_GATEWAY_URL`) não mudou.
+- **CORS preflight (distribution)**: o `default_cache_behavior` do CloudFront da distribution
+  precisa da managed origin request policy **CORS-CustomOrigin**
+  (`origin_request_policy_id = "59781a5b-3903-41f3-afcb-af62929ccde1"`). Sem ela o CloudFront
+  não repassa `Access-Control-Request-Method/Headers` à origem, o Fiber não reconhece o
+  `OPTIONS` como preflight e devolve `405`, quebrando o `GET` cross-site do web-client. O CORS
+  fica só no Fiber (`AllowMethods GET,OPTIONS` / `AllowHeaders X-API-Key,Content-Type`); o
+  CloudFront apenas encaminha os headers. Detalhe em `docs/cors-preflight-405-distribution.md`.
 
 ## Outros ajustes do deploy real
 

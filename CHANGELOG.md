@@ -1,3 +1,16 @@
+## [Unreleased] 2026-06-08 — fix: preflight CORS 405 na distribution (CloudFront não repassava headers)
+### Fixed
+- `modules/distribution-lambda`: adicionada a managed origin request policy
+  **CORS-CustomOrigin** (`59781a5b-3903-41f3-afcb-af62929ccde1`) ao `default_cache_behavior`
+  do CloudFront. Sem ela, o CloudFront não encaminhava `Access-Control-Request-Method`/
+  `Access-Control-Request-Headers` para a origem; o middleware CORS do Fiber
+  (`gofiber/fiber v2.52.13`) não classificava o `OPTIONS` como preflight, caía no router
+  (só `GET`/`HEAD`) e devolvia **`405 Allow: GET, HEAD`**, fazendo o navegador bloquear o
+  `GET` cross-site do `streaming-web-client` (`d3fl4gu1sp7re2` → `d2qy6ma0p8fdhs`,
+  `GET /api/v1/videos` com header custom `x-api-key`). A policy encaminha os headers de
+  preflight (sem `Host`, preservando o API Gateway), deixando o Fiber responder `204`.
+  Diagnóstico em `docs/cors-preflight-405-distribution.md`.
+
 ## [Unreleased] 2026-06-08 — deploy real: Function URL pública bloqueada → API Gateway
 ### Changed
 - `modules/ingest-lambda`: substituída a Function URL por **API Gateway HTTP API**
