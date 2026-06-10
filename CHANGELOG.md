@@ -1,3 +1,7 @@
+## [Unreleased] 2026-06-10
+### Added
+- Benchmark architecture is now config-driven: `benchmark_ami_arch` (x86_64|arm64) drives the AMI filter and `benchmark_image_tag` selects the ECR tag. Graviton runs no longer require editing the module — set `benchmark_ami_arch=arm64` plus a matching image tag.
+
 ## [Unreleased] 2026-06-09
 ### Added
 - transcode-ec2-benchmark module (toggleable single EC2 running the worker with TRANSCODE_MACHINE_LABEL and prefetch=1) for cross-machine codec benchmarking. Default x86_64 (c5.xlarge); arm64/Graviton requires an arm64 image build.

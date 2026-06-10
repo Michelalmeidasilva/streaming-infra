@@ -85,3 +85,19 @@ variable "benchmark_machine_label" {
   type        = string
   default     = ""
 }
+
+variable "benchmark_ami_arch" {
+  description = "CPU architecture for the benchmark AMI and instance: x86_64 or arm64 (Graviton). Must match the architecture of the image referenced by benchmark_image_tag."
+  type        = string
+  default     = "x86_64"
+  validation {
+    condition     = contains(["x86_64", "arm64"], var.benchmark_ami_arch)
+    error_message = "benchmark_ami_arch must be \"x86_64\" or \"arm64\"."
+  }
+}
+
+variable "benchmark_image_tag" {
+  description = "ECR tag of the vod-transcode image the benchmark instance runs. Use a tag whose architecture matches benchmark_ami_arch (e.g. a multi-arch \"latest\", or a dedicated \"arm64\")."
+  type        = string
+  default     = "latest"
+}

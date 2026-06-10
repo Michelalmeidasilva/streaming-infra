@@ -169,16 +169,18 @@ output "cost_guard_killswitch_function" {
 
 # 13. Transcode EC2 benchmark — single instance for codec benchmarking.
 # Disabled by default; enable with enable_transcode_benchmark=true.
-# Default is x86_64 (c5.xlarge) to match the amd64 ECR image built by CI.
-# NOTE: arm64 benchmarking (e.g. c7g.xlarge) requires building a separate
-# arm64 image first and switching the AMI filter to "al2023-ami-*-arm64".
+# Architecture is config-driven via benchmark_ami_arch (x86_64 default; set
+# arm64 for Graviton such as c7g.xlarge). The AMI and the image tag
+# (benchmark_image_tag) must agree on architecture — arm64 requires an arm64
+# transcode image in ECR (a multi-arch "latest" or a dedicated "arm64" tag),
+# otherwise the container fails to start with "exec format error".
 data "aws_ami" "al2023_benchmark" {
   most_recent = true
   owners      = ["amazon"]
 
   filter {
     name   = "name"
-    values = ["al2023-ami-*-x86_64"]
+    values = ["al2023-ami-*-${var.benchmark_ami_arch}"]
   }
 
   filter {
@@ -188,7 +190,7 @@ data "aws_ami" "al2023_benchmark" {
 
   filter {
     name   = "architecture"
-    values = ["x86_64"]
+    values = [var.benchmark_ami_arch]
   }
 }
 
@@ -200,7 +202,7 @@ module "transcode_ec2_benchmark" {
   machine_label = var.benchmark_machine_label
   environment   = var.environment
 
-  image_uri         = "${module.ecr.repository_urls["vod-transcode"]}:latest"
+  image_uri         = "${module.ecr.repository_urls["vod-transcode"]}:${var.benchmark_image_tag}"
   subnet_id         = module.network.public_subnet_ids[0]
   security_group_id = module.network.batch_security_group_id
   ami_id            = data.aws_ami.al2023_benchmark.id

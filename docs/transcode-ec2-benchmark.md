@@ -14,6 +14,8 @@ main platform infrastructure.
 | `enable_transcode_benchmark` | bool | `false` | Master toggle. Set `true` to create the EC2 instance. |
 | `benchmark_instance_type` | string | `c5.xlarge` | EC2 instance type to benchmark. Change this and re-apply to test a different machine. |
 | `benchmark_machine_label` | string | `""` | Human-readable label written to `TRANSCODE_MACHINE_LABEL`. When empty, defaults to the value of `benchmark_instance_type`. |
+| `benchmark_ami_arch` | string | `x86_64` | CPU architecture for the AMI and instance: `x86_64` or `arm64` (Graviton). Must match the architecture of `benchmark_image_tag`. |
+| `benchmark_image_tag` | string | `latest` | ECR tag of `vod-transcode` the instance runs. Use a tag whose architecture matches `benchmark_ami_arch` (a multi-arch `latest`, or a dedicated `arm64`). |
 
 ## How the Instance Works
 
@@ -50,18 +52,29 @@ destroyed and no charges continue.
 The module defaults to `c5.xlarge` (x86_64) and selects an Amazon Linux 2023 AMI filtered
 for `al2023-ami-*-x86_64`. This matches the ECR transcode image, which is built `amd64`.
 
-**Benchmarking Graviton (arm64) instances** (e.g. `c7g.xlarge`, `c7g.2xlarge`) requires:
+**Benchmarking Graviton (arm64) instances** (e.g. `c7g.xlarge`, `c7g.2xlarge`) is
+config-driven — no module edits required:
 
-1. Building and pushing an `arm64` ECR image:
+1. Build and push an arm64-capable image. The transcode `Makefile` provides a target
+   (the Dockerfile is multi-arch-safe: pure-Go build + `apt-get` ffmpeg per arch):
    ```bash
-   docker buildx build --platform linux/arm64 -t <ecr-uri>/vod-transcode:arm64 --push .
+   # multi-arch latest (keeps the amd64 Fargate path working, adds arm64):
+   make -C streaming-transcode image-push-multiarch
+   # or a dedicated arm64 tag:
+   make -C streaming-transcode image-push-multiarch PLATFORMS=linux/arm64 IMAGE_TAG=arm64
    ```
-2. Updating the `benchmark_instance_type` to a Graviton type.
-3. Updating the AMI filter in the module from `al2023-ami-*-x86_64` to `al2023-ami-*-arm64`.
-4. Pointing the `user_data` to the `arm64` image tag.
+2. In `terraform.tfvars`, set:
+   ```hcl
+   benchmark_instance_type = "c7g.xlarge"
+   benchmark_ami_arch      = "arm64"
+   benchmark_image_tag     = "latest"   # multi-arch; or "arm64" for the dedicated tag
+   ```
+   The AMI filter (`al2023-ami-*-${benchmark_ami_arch}`) and the instance follow
+   `benchmark_ami_arch` automatically.
+3. `terraform apply`.
 
-Without these steps, a Graviton instance will pull the `amd64` image and fail to run (or
-silently produce wrong results via emulation).
+If `benchmark_ami_arch` and the image tag's architecture disagree, the container fails to
+start with `exec format error` — keep them consistent.
 
 ## Applied Separately from the Platform
 

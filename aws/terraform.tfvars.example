@@ -27,3 +27,12 @@ alert_email       = "voce@exemplo.com"
 enable_transcode_benchmark = false
 benchmark_instance_type    = "c5.xlarge"
 benchmark_machine_label    = ""
+# Architecture must match the transcode image you push to ECR.
+#   x86_64 (default): benchmark_ami_arch = "x86_64", benchmark_image_tag = "latest"
+#   Graviton/arm64:   build an arm64 image first, e.g.
+#                       make -C ../../streaming-transcode image-push-multiarch
+#                     then set: benchmark_instance_type = "c7g.xlarge"
+#                               benchmark_ami_arch       = "arm64"
+#                               benchmark_image_tag      = "latest"  # multi-arch, or "arm64"
+benchmark_ami_arch  = "x86_64"
+benchmark_image_tag = "latest"
