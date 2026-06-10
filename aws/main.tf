@@ -167,65 +167,34 @@ output "cost_guard_killswitch_function" {
   value = module.cost_guard.killswitch_function_name
 }
 
-# 13. Transcode EC2 benchmark — single instance for codec benchmarking.
-# Disabled by default; enable with enable_transcode_benchmark=true.
-# Architecture is config-driven via benchmark_ami_arch (x86_64 default; set
-# arm64 for Graviton such as c7g.xlarge). The AMI and the image tag
-# (benchmark_image_tag) must agree on architecture — arm64 requires an arm64
-# transcode image in ECR (a multi-arch "latest" or a dedicated "arm64" tag),
-# otherwise the container fails to start with "exec format error".
-data "aws_ami" "al2023_benchmark" {
-  most_recent = true
-  owners      = ["amazon"]
+# 13. Transcode benchmark harness — self-terminating EC2, corpus-driven.
+# Disabled by default; enable with enable_transcode_benchmark_harness=true.
+# Upload clips to s3://<bucket>/benchmark/corpus/, then apply.
+# The instance runs the benchmark binary over the corpus matrix and self-terminates.
+module "transcode_benchmark_harness" {
+  source = "./modules/transcode-benchmark-harness"
 
-  filter {
-    name   = "name"
-    values = ["al2023-ami-*-${var.benchmark_ami_arch}"]
-  }
-
-  filter {
-    name   = "state"
-    values = ["available"]
-  }
-
-  filter {
-    name   = "architecture"
-    values = [var.benchmark_ami_arch]
-  }
-}
-
-module "transcode_ec2_benchmark" {
-  source = "./modules/transcode-ec2-benchmark"
-
-  enabled       = var.enable_transcode_benchmark
+  enabled       = var.enable_transcode_benchmark_harness
   instance_type = var.benchmark_instance_type
+  ami_arch      = var.benchmark_ami_arch
   machine_label = var.benchmark_machine_label
-  environment   = var.environment
 
-  image_uri         = "${module.ecr.repository_urls["vod-transcode"]}:${var.benchmark_image_tag}"
-  subnet_id         = module.network.public_subnet_ids[0]
-  security_group_id = module.network.batch_security_group_id
-  ami_id            = data.aws_ami.al2023_benchmark.id
-
-  bucket               = module.storage_s3.bucket_id
+  image_uri            = "${module.ecr.repository_urls["vod-transcode"]}:${var.benchmark_image_tag}"
+  subnet_id            = module.network.public_subnet_ids[0]
+  security_group_id    = module.network.batch_security_group_id
   aws_region           = var.aws_region
+  corpus_bucket        = module.storage_s3.bucket_id
+  corpus_prefix        = var.benchmark_corpus_prefix
+  codecs               = var.benchmark_codecs
+  resolutions          = var.benchmark_resolutions
+  repeats              = var.benchmark_repeats
+  ingest_benchmark_url = "${module.ingest_lambda.function_url}api/v1"
   ssm_parameter_prefix = module.ssm_secrets.parameter_prefix
   ssm_parameter_arns   = module.ssm_secrets.parameter_arns
-  event_gateway_url    = "${module.ingest_lambda.function_url}api/v1"
-
-  tags = {
-    Environment = var.environment
-    ManagedBy   = "terraform"
-    Purpose     = "codec-benchmark"
-  }
+  tags                 = { Environment = var.environment }
 }
 
 output "benchmark_instance_id" {
-  value       = module.transcode_ec2_benchmark.instance_id
-  description = "EC2 benchmark instance ID (null when disabled)."
-}
-
-output "benchmark_machine_label" {
-  value       = module.transcode_ec2_benchmark.machine_label
-  description = "Machine label used to tag benchmark runs."
+  value       = module.transcode_benchmark_harness.instance_id
+  description = "EC2 benchmark harness instance ID (null when disabled)."
 }

@@ -67,9 +67,9 @@ variable "alert_email" {
   description = "E-mail que recebe alertas de budget e confirmação do kill-switch."
 }
 
-# --- Transcode EC2 benchmark (codec benchmarking, off by default) ---
-variable "enable_transcode_benchmark" {
-  description = "Spin up a single EC2 instance running the transcode worker for codec benchmarking."
+# --- Transcode benchmark harness (corpus-driven, self-terminating, off by default) ---
+variable "enable_transcode_benchmark_harness" {
+  description = "Spin up the self-terminating corpus-driven benchmark harness EC2 instance."
   type        = bool
   default     = false
 }
@@ -100,4 +100,28 @@ variable "benchmark_image_tag" {
   description = "ECR tag of the vod-transcode image the benchmark instance runs. Use a tag whose architecture matches benchmark_ami_arch (e.g. a multi-arch \"latest\", or a dedicated \"arm64\")."
   type        = string
   default     = "latest"
+}
+
+variable "benchmark_corpus_prefix" {
+  description = "S3 key prefix where benchmark corpus clips live (e.g. benchmark/corpus/)."
+  type        = string
+  default     = "benchmark/corpus/"
+}
+
+variable "benchmark_codecs" {
+  description = "Comma-separated list of codecs the benchmark matrix exercises."
+  type        = string
+  default     = "h264,h265,av1"
+}
+
+variable "benchmark_resolutions" {
+  description = "Comma-separated WxH:bitrate pairs for the benchmark resolution ladder."
+  type        = string
+  default     = "1280x720:3000,1920x1080:6000"
+}
+
+variable "benchmark_repeats" {
+  description = "Number of times each corpus clip is re-encoded per codec/resolution combination."
+  type        = number
+  default     = 3
 }
