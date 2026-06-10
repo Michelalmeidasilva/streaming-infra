@@ -1,4 +1,8 @@
 ## [Unreleased] 2026-06-10
+### Changed
+- Replaced transcode-ec2-benchmark (queue worker) with transcode-benchmark-harness: a self-terminating EC2 that runs the codec matrix over an S3 corpus and posts benchmark runs. New benchmark_* corpus/matrix vars.
+
+## [Unreleased] 2026-06-10
 ### Added
 - Benchmark architecture is now config-driven: `benchmark_ami_arch` (x86_64|arm64) drives the AMI filter and `benchmark_image_tag` selects the ECR tag. Graviton runs no longer require editing the module — set `benchmark_ami_arch=arm64` plus a matching image tag.
 
