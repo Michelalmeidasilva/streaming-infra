@@ -1,3 +1,7 @@
+## [Unreleased] 2026-06-09
+### Added
+- transcode-ec2-benchmark module (toggleable single EC2 running the worker with TRANSCODE_MACHINE_LABEL and prefetch=1) for cross-machine codec benchmarking. Default x86_64 (c5.xlarge); arm64/Graviton requires an arm64 image build.
+
 ## [Unreleased] 2026-06-08 — fix: CORS da mídia no edge (player manda x-api-key → 403)
 ### Fixed
 - `modules/distribution-lambda`: o player (Shaka) injeta o header custom `x-api-key` em TODA
