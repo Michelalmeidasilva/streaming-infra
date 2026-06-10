@@ -18,3 +18,12 @@ cors_allowed_origins = [
 monthly_limit_usd = 40
 daily_limit_usd   = 3
 alert_email       = "voce@exemplo.com"
+
+# --- Transcode codec benchmark (off by default) ---
+# Workflow: enable + set instance type → terraform apply → upload one video
+# in the platform → read Metrics/CloudWatch → change instance type → re-apply.
+# The worker tags every transcode run with benchmark_machine_label so results
+# can be compared across instance types.
+enable_transcode_benchmark = false
+benchmark_instance_type    = "c5.xlarge"
+benchmark_machine_label    = ""

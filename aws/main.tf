@@ -166,3 +166,64 @@ module "cost_guard" {
 output "cost_guard_killswitch_function" {
   value = module.cost_guard.killswitch_function_name
 }
+
+# 13. Transcode EC2 benchmark — single instance for codec benchmarking.
+# Disabled by default; enable with enable_transcode_benchmark=true.
+# Default is x86_64 (c5.xlarge) to match the amd64 ECR image built by CI.
+# NOTE: arm64 benchmarking (e.g. c7g.xlarge) requires building a separate
+# arm64 image first and switching the AMI filter to "al2023-ami-*-arm64".
+data "aws_ami" "al2023_benchmark" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["al2023-ami-*-x86_64"]
+  }
+
+  filter {
+    name   = "state"
+    values = ["available"]
+  }
+
+  filter {
+    name   = "architecture"
+    values = ["x86_64"]
+  }
+}
+
+module "transcode_ec2_benchmark" {
+  source = "./modules/transcode-ec2-benchmark"
+
+  enabled       = var.enable_transcode_benchmark
+  instance_type = var.benchmark_instance_type
+  machine_label = var.benchmark_machine_label
+  environment   = var.environment
+
+  image_uri         = "${module.ecr.repository_urls["vod-transcode"]}:latest"
+  subnet_id         = module.network.public_subnet_ids[0]
+  security_group_id = module.network.batch_security_group_id
+  ami_id            = data.aws_ami.al2023_benchmark.id
+
+  bucket               = module.storage_s3.bucket_id
+  aws_region           = var.aws_region
+  ssm_parameter_prefix = module.ssm_secrets.parameter_prefix
+  ssm_parameter_arns   = module.ssm_secrets.parameter_arns
+  event_gateway_url    = "${module.ingest_lambda.function_url}api/v1"
+
+  tags = {
+    Environment = var.environment
+    ManagedBy   = "terraform"
+    Purpose     = "codec-benchmark"
+  }
+}
+
+output "benchmark_instance_id" {
+  value       = module.transcode_ec2_benchmark.instance_id
+  description = "EC2 benchmark instance ID (null when disabled)."
+}
+
+output "benchmark_machine_label" {
+  value       = module.transcode_ec2_benchmark.machine_label
+  description = "Machine label used to tag benchmark runs."
+}
