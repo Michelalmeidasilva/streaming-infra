@@ -179,7 +179,9 @@ module "transcode_benchmark_harness" {
   ami_arch      = var.benchmark_ami_arch
   machine_label = var.benchmark_machine_label
 
-  image_uri            = "${module.ecr.repository_urls["vod-transcode"]}:${var.benchmark_image_tag}"
+  gpu                  = var.benchmark_gpu
+  encoder_backend      = var.benchmark_gpu ? "nvenc" : "software"
+  image_uri            = var.benchmark_gpu ? "${module.ecr.repository_urls["vod-transcode-gpu"]}:${var.benchmark_image_tag}" : "${module.ecr.repository_urls["vod-transcode"]}:${var.benchmark_image_tag}"
   subnet_id            = module.network.public_subnet_ids[0]
   security_group_id    = module.network.batch_security_group_id
   aws_region           = var.aws_region

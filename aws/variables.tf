@@ -125,3 +125,9 @@ variable "benchmark_repeats" {
   type        = number
   default     = 3
 }
+
+variable "benchmark_gpu" {
+  description = "When true, the benchmark harness uses the GPU image (vod-transcode-gpu) with the nvenc encoder backend on an NVIDIA GPU instance."
+  type        = bool
+  default     = false
+}

@@ -90,3 +90,21 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "gpu" {
+  description = "When true, launch a GPU instance from the NVIDIA Deep Learning AMI and run the container with --gpus all."
+  type        = bool
+  default     = false
+}
+
+variable "gpu_ami_name_filter" {
+  description = "Name filter for the NVIDIA-driver AMI used when gpu=true (arch-matched by the data source)."
+  type        = string
+  default     = "Deep Learning Base OSS Nvidia Driver GPU AMI (Ubuntu 22.04)*"
+}
+
+variable "encoder_backend" {
+  description = "Encoder backend passed to the container as TRANSCODE_ENCODER_BACKEND (software or nvenc)."
+  type        = string
+  default     = "software"
+}

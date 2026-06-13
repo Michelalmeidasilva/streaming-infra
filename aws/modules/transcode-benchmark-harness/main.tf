@@ -1,6 +1,9 @@
 locals {
-  count_n      = var.enabled ? 1 : 0
-  ecr_registry = split("/", var.image_uri)[0]
+  count_n         = var.enabled ? 1 : 0
+  ecr_registry    = split("/", var.image_uri)[0]
+  ami_id          = var.gpu ? data.aws_ami.gpu.id : data.aws_ami.al2023.id
+  gpu_flag        = var.gpu ? "--gpus all" : ""
+  encoder_backend = var.encoder_backend
 }
 
 # ---- AMI lookup: Amazon Linux 2023 matching the requested architecture ----
@@ -12,6 +15,28 @@ data "aws_ami" "al2023" {
   filter {
     name   = "name"
     values = ["al2023-ami-*-${var.ami_arch}"]
+  }
+
+  filter {
+    name   = "architecture"
+    values = [var.ami_arch]
+  }
+
+  filter {
+    name   = "state"
+    values = ["available"]
+  }
+}
+
+# ---- AMI lookup: NVIDIA Deep Learning AMI (used when gpu=true) ----
+
+data "aws_ami" "gpu" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = [var.gpu_ami_name_filter]
   }
 
   filter {
@@ -131,7 +156,7 @@ resource "aws_iam_instance_profile" "benchmark" {
 
 resource "aws_instance" "benchmark" {
   count                                = local.count_n
-  ami                                  = data.aws_ami.al2023.id
+  ami                                  = local.ami_id
   instance_type                        = var.instance_type
   subnet_id                            = var.subnet_id
   vpc_security_group_ids               = [var.security_group_id]
@@ -183,7 +208,7 @@ resource "aws_instance" "benchmark" {
       --query Parameter.Value \
       --output text)
 
-    docker run --rm \
+    docker run --rm ${local.gpu_flag} \
       --log-driver=awslogs \
       --log-opt awslogs-region="$REGION" \
       --log-opt awslogs-group=/vod/benchmark/transcode \
@@ -200,6 +225,7 @@ resource "aws_instance" "benchmark" {
       -e BENCHMARK_REPEATS="${var.repeats}" \
       -e INGEST_BENCHMARK_URL="${var.ingest_benchmark_url}" \
       -e BENCHMARK_MACHINE_LABEL="${var.machine_label}" \
+      -e TRANSCODE_ENCODER_BACKEND="${local.encoder_backend}" \
       "${var.image_uri}" benchmark
   EOT
 
