@@ -1,5 +1,6 @@
 ## [Unreleased] 2026-06-13
 ### Added
+- harness benchmark_mode + quality_points passthrough for the R-D study.
 - transcode-benchmark-harness GPU mode: NVIDIA Deep Learning AMI + --gpus all + nvenc backend + vod-transcode-gpu image, gated on the benchmark_gpu variable. New vod-transcode-gpu ECR repo.
 
 ## [Unreleased] 2026-06-10
