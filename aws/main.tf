@@ -35,7 +35,7 @@ module "ssm_secrets" {
 # 5. ECR — repositórios de imagem para os 3 serviços container.
 module "ecr" {
   source           = "./modules/ecr"
-  repository_names = ["vod-ingest", "vod-distribution", "vod-transcode"]
+  repository_names = ["vod-ingest", "vod-distribution", "vod-transcode", "vod-transcode-gpu"]
 }
 
 # 6. Lambda do ingest (Event Gateway).
