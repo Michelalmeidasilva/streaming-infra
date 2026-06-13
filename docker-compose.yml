@@ -172,6 +172,10 @@ services:
       # admin@local.dev → ADMIN.
       E2E_AUTH_ENABLED: "1"
       E2E_ADMIN_EMAIL: admin@local.dev
+      # Distribution load-test data source (scalestore-api). Runs on the HOST
+      # (bench/scale/store: `go run ./cmd/scalestore-api`), so reach it via the
+      # Docker Desktop host gateway. Server-side var read by /api/distribution-runs.
+      SCALESTORE_API_URL: http://host.docker.internal:8090
       # STORAGE_PROVIDER: minio
       # STORAGE_BUCKET: videos
       # MINIO_ACCESS_KEY: admin
