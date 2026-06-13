@@ -164,7 +164,10 @@ resource "aws_instance" "benchmark" {
   instance_initiated_shutdown_behavior = "terminate"
 
   root_block_device {
-    volume_size = 50
+    # GPU (NVIDIA Deep Learning) AMIs ship a large root snapshot (>=75GB); the
+    # AL2023 CPU AMI is small. Size up for GPU, leaving room for the corpus +
+    # transcode outputs written to the root volume.
+    volume_size = var.gpu ? 100 : 50
     volume_type = "gp3"
   }
 
