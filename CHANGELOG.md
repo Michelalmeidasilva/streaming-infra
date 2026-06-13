@@ -1,3 +1,7 @@
+## [Unreleased] 2026-06-13
+### Added
+- transcode-benchmark-harness GPU mode: NVIDIA Deep Learning AMI + --gpus all + nvenc backend + vod-transcode-gpu image, gated on the benchmark_gpu variable. New vod-transcode-gpu ECR repo.
+
 ## [Unreleased] 2026-06-10
 ### Changed
 - Replaced transcode-ec2-benchmark (queue worker) with transcode-benchmark-harness: a self-terminating EC2 that runs the codec matrix over an S3 corpus and posts benchmark runs. New benchmark_* corpus/matrix vars.

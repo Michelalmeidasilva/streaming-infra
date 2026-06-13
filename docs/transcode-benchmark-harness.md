@@ -130,3 +130,83 @@ The benchmark harness is intentionally isolated from the main transcode pipeline
   /api/v1/benchmark-runs` — never to the video catalog or upload-state.
 - The production Batch job definition, EventBridge rules, and RabbitMQ exchange are
   unchanged. No coordination with live traffic is required.
+
+## GPU Mode (NVENC)
+
+### Additional Variables
+
+**Root variable** (`infra/aws/variables.tf`):
+
+| Variable | Type | Default | Description |
+|---|---|---|---|
+| `benchmark_gpu` | bool | `false` | GPU mode toggle. When `true`, the harness uses the NVIDIA Deep Learning AMI and runs `docker --gpus all` with `TRANSCODE_ENCODER_BACKEND=nvenc`. The root module wires this into the module's `gpu` and `encoder_backend` inputs. |
+
+**Module variables** (`transcode-benchmark-harness`), set by the root from `benchmark_gpu`:
+
+| Variable | Type | Default | Description |
+|---|---|---|---|
+| `gpu` | bool | `false` | When `true`, select the NVIDIA Deep Learning AMI and add `--gpus all` to the container run. Set to `var.benchmark_gpu` by the root. |
+| `gpu_ami_name_filter` | string | `"Deep Learning Base OSS Nvidia Driver GPU AMI (Ubuntu 22.04)*"` | AMI name filter used when `gpu=true`. Overrideable if a different DLAMI variant is needed. |
+| `encoder_backend` | string | `"software"` | Passed to `TRANSCODE_ENCODER_BACKEND` in the container. The root sets it to `"nvenc"` when `benchmark_gpu=true`. |
+
+### How GPU Mode Works
+
+When `benchmark_gpu=true` Terraform:
+
+1. Resolves `local.ami_id` via the `gpu_ami_name_filter` rather than the standard Amazon
+   Linux 2023 filter. The NVIDIA Deep Learning AMI ships with the NVIDIA driver and Docker
+   GPU runtime pre-installed.
+2. Runs the benchmark container with `docker run --gpus all` in user-data, making the GPU
+   visible inside the container.
+3. Sets `-e TRANSCODE_ENCODER_BACKEND=nvenc` so the benchmark binary routes each codec to
+   its NVENC encoder.
+4. Pulls the `vod-transcode-gpu` image (from the `vod-transcode-gpu` ECR repository) instead
+   of `vod-transcode`.
+
+The IAM `ECRPull` policy already uses `resources = ["*"]`, so it covers `vod-transcode-gpu`
+without any IAM change.
+
+### ECR Repository
+
+A dedicated ECR repository `vod-transcode-gpu` was added to the `ecr` module's
+`repository_names` in `infra/aws/main.tf`. Build and push instructions are in
+`streaming-transcode/docs/codec-benchmark-harness.md`.
+
+### Per-Device Codec Matrix
+
+| Device | GPU chip | Arch | `benchmark_codecs` |
+|---|---|---|---|
+| g4dn | T4 | x86_64 | `h264,h265` |
+| g5g | T4G | arm64 | `h264,h265` |
+| g6 | L4 | x86_64 | `h264,h265,av1` |
+| g6e | L40S | x86_64 | `h264,h265,av1` |
+
+`av1_nvenc` requires Ada Lovelace (L4 / L40S). Do not include `av1` for g4dn or g5g.
+
+For g5g (arm64) also set `-var benchmark_ami_arch=arm64` and push the `arm64` GPU image tag
+(`Dockerfile.gpu.arm64`).
+
+### Example — Run a g6.xlarge GPU benchmark
+
+```bash
+cd /Users/user/workspace-personal/video-on-demand-arch/microsservices
+infra/bin/terraform -chdir=infra/aws apply \
+  -target=module.transcode_benchmark_harness \
+  -var enable_transcode_benchmark_harness=true \
+  -var benchmark_gpu=true \
+  -var benchmark_instance_type=g6.xlarge \
+  -var benchmark_repeats=1 \
+  -var 'benchmark_codecs=h264,h265,av1'
+```
+
+### GPU Service Quota Prerequisite
+
+GPU instance launches are subject to Service Quotas. Before `terraform apply`:
+
+- **x86_64 GPU** (g4dn, g6, g6e): request **"Running On-Demand G and VT instances"** in
+  EC2 → Service Quotas (us-east-2). Minimum 4 vCPUs covers `*.xlarge`.
+- **arm64 GPU** (g5g): request the corresponding arm64 G-instance quota.
+
+`terraform apply` will succeed (the resource is created) but the EC2 instance will fail to
+launch (`InsufficientInstanceCapacity` or quota error) and no benchmark runs will be posted.
+Request the quota increase first, then re-apply.
