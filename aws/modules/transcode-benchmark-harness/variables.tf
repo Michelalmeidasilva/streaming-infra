@@ -108,3 +108,15 @@ variable "encoder_backend" {
   type        = string
   default     = "software"
 }
+
+variable "benchmark_mode" {
+  description = "throughput (default) or rd (rate-distortion quality sweep)."
+  type        = string
+  default     = "throughput"
+}
+
+variable "quality_points" {
+  description = "Per-codec CRF/CQ lists for rd mode, e.g. h264=19,25,31;av1=20,40,55."
+  type        = string
+  default     = ""
+}

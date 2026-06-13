@@ -131,3 +131,15 @@ variable "benchmark_gpu" {
   type        = bool
   default     = false
 }
+
+variable "benchmark_mode" {
+  description = "throughput or rd."
+  type        = string
+  default     = "throughput"
+}
+
+variable "benchmark_quality_points" {
+  description = "Per-codec CRF/CQ lists for rd mode."
+  type        = string
+  default     = ""
+}

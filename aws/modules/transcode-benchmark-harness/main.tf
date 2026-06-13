@@ -235,6 +235,8 @@ resource "aws_instance" "benchmark" {
       -e BENCHMARK_CODECS="${var.codecs}" \
       -e BENCHMARK_RESOLUTIONS="${var.resolutions}" \
       -e BENCHMARK_REPEATS="${var.repeats}" \
+      -e BENCHMARK_MODE="${var.benchmark_mode}" \
+      -e BENCHMARK_QUALITY_POINTS="${var.quality_points}" \
       -e INGEST_BENCHMARK_URL="${var.ingest_benchmark_url}" \
       -e BENCHMARK_MACHINE_LABEL="${var.machine_label}" \
       -e TRANSCODE_ENCODER_BACKEND="${local.encoder_backend}" \

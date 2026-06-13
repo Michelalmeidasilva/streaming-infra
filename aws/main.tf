@@ -193,6 +193,8 @@ module "transcode_benchmark_harness" {
   ingest_benchmark_url = "${module.ingest_lambda.function_url}api/v1"
   ssm_parameter_prefix = module.ssm_secrets.parameter_prefix
   ssm_parameter_arns   = module.ssm_secrets.parameter_arns
+  benchmark_mode       = var.benchmark_mode
+  quality_points       = var.benchmark_quality_points
   tags                 = { Environment = var.environment }
 }
 
