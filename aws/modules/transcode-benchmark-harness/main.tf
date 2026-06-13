@@ -145,6 +145,15 @@ resource "aws_iam_role_policy" "benchmark" {
   policy = data.aws_iam_policy_document.benchmark_permissions.json
 }
 
+# SSM core so operators can shell into a live instance to debug (e.g. GPU/NVENC
+# issues): aws ssm send-command / start-session. The Deep Learning and AL2023
+# AMIs ship the SSM agent, so attaching this is enough to register the instance.
+resource "aws_iam_role_policy_attachment" "benchmark_ssm" {
+  count      = local.count_n
+  role       = aws_iam_role.benchmark[0].name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
 resource "aws_iam_instance_profile" "benchmark" {
   count = local.count_n
   name  = "vod-transcode-benchmark-harness"
