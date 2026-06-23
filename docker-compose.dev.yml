@@ -99,7 +99,7 @@ services:
       # Em `next dev` as NEXT_PUBLIC_* são lidas em runtime (não "assadas" no
       # bundle como no build de produção), então passamos por env aqui.
       NEXT_PUBLIC_E2E_AUTH_ENABLED: "1"
-      NEXT_PUBLIC_E2E_ADMIN_EMAIL: admin@local.dev
+      NEXT_PUBLIC_E2E_ADMIN_EMAIL: ${E2E_ADMIN_EMAIL:-admin@local.dev}
       NEXT_PUBLIC_STORAGE_DIRECT_UPLOAD_ENABLED: "false"
       # File watching confiável sobre bind-mount no Docker Desktop (macOS).
       WATCHPACK_POLLING: "true"

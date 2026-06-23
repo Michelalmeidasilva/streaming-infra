@@ -1,5 +1,14 @@
 .PHONY: help up down logs status restart clean test-mongo test-rabbitmq test-redis test-minio ps build
 
+# Credenciais de dev — sobrescreva exportando no shell (ou via `make X VAR=...`).
+# Não versionar valores reais aqui; produção usa SSM/secret manager (ver aws/).
+MONGODB_USERNAME ?= admin
+MONGODB_PASSWORD ?= password
+RABBITMQ_USERNAME ?= guest
+RABBITMQ_PASSWORD ?= guest
+MINIO_ROOT_USER ?= admin
+MINIO_ROOT_PASSWORD ?= password123
+
 help:
 	@echo "VOD Platform Infrastructure - Common Commands"
 	@echo ""
@@ -33,11 +42,11 @@ up:
 	@echo "✓ Infrastructure started"
 	@echo ""
 	@echo "Service URLs:"
-	@echo "  MongoDB:     mongodb://admin:password@localhost:27017"
-	@echo "  RabbitMQ:    http://localhost:15672 (guest/guest)"
+	@echo "  MongoDB:     mongodb://$(MONGODB_USERNAME):$(MONGODB_PASSWORD)@localhost:27017"
+	@echo "  RabbitMQ:    http://localhost:15672 ($(RABBITMQ_USERNAME)/$(RABBITMQ_PASSWORD))"
 	@echo "  Redis:       redis://localhost:6379"
-	@echo "  MinIO:       http://localhost:9001 (admin/password123)"
-	@echo "  Mongo UI:    http://localhost:8081 (admin/password)"
+	@echo "  MinIO:       http://localhost:9001 ($(MINIO_ROOT_USER)/$(MINIO_ROOT_PASSWORD))"
+	@echo "  Mongo UI:    http://localhost:8081 ($(MONGODB_USERNAME)/$(MONGODB_PASSWORD))"
 
 down:
 	@echo "Stopping infrastructure..."
@@ -69,7 +78,7 @@ build:
 test-mongo:
 	@echo "Testing MongoDB connection..."
 	@docker exec mongodb mongosh --version > /dev/null 2>&1 && \
-		docker exec mongodb mongosh "mongodb://admin:password@localhost:27017/?authSource=admin" \
+		docker exec mongodb mongosh "mongodb://$(MONGODB_USERNAME):$(MONGODB_PASSWORD)@localhost:27017/?authSource=admin" \
 			--eval "db.runCommand('ping')" 2>&1 | grep -q "1" && \
 		echo "✓ MongoDB is healthy" || echo "✗ MongoDB connection failed"
 
@@ -94,21 +103,21 @@ test-all: test-mongo test-rabbitmq test-redis test-minio
 
 # Shell access
 shell-mongo:
-	@docker exec -it mongodb mongosh "mongodb://admin:password@localhost:27017/streaming?authSource=admin"
+	@docker exec -it mongodb mongosh "mongodb://$(MONGODB_USERNAME):$(MONGODB_PASSWORD)@localhost:27017/streaming?authSource=admin"
 
 shell-redis:
 	@docker exec -it redis redis-cli
 
 shell-rabbitmq:
-	@echo "RabbitMQ Management UI: http://localhost:15672 (guest/guest)"
+	@echo "RabbitMQ Management UI: http://localhost:15672 ($(RABBITMQ_USERNAME)/$(RABBITMQ_PASSWORD))"
 
 shell-mongo-express:
-	@echo "Mongo Express: http://localhost:8081 (admin/password)"
+	@echo "Mongo Express: http://localhost:8081 ($(MONGODB_USERNAME)/$(MONGODB_PASSWORD))"
 
 # MinIO utilities
 reset-buckets:
 	@echo "Resetting MinIO buckets..."
-	@docker exec minio mc alias set local http://localhost:9000 admin password123 > /dev/null 2>&1
+	@docker exec minio mc alias set local http://localhost:9000 $(MINIO_ROOT_USER) $(MINIO_ROOT_PASSWORD) > /dev/null 2>&1
 	@docker exec minio mc rm -r --force local/videos > /dev/null 2>&1 || true
 	@docker exec minio mc mb local/videos
 	@echo "✓ MinIO buckets reset"
