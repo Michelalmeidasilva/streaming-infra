@@ -21,6 +21,10 @@ run "cpu_x86_uses_cpu_image" {
     condition     = local.instances["c5.xlarge"].arch == "x86_64"
     error_message = "c5.xlarge deve ser x86_64."
   }
+  assert {
+    condition     = local.instances["c5.xlarge"].ami == data.aws_ami.al2023_x86.id
+    error_message = "c5.xlarge deve usar o AMI AL2023 x86_64."
+  }
 }
 
 run "graviton_uses_cpu_image_arm" {
@@ -36,6 +40,10 @@ run "graviton_uses_cpu_image_arm" {
     condition     = local.instances["c7g.xlarge"].arch == "arm64"
     error_message = "c7g.xlarge deve ser arm64."
   }
+  assert {
+    condition     = local.instances["c7g.xlarge"].ami == data.aws_ami.al2023_arm.id
+    error_message = "c7g.xlarge deve usar o AMI AL2023 arm64."
+  }
 }
 
 run "gpu_uses_gpu_image" {
@@ -50,5 +58,9 @@ run "gpu_uses_gpu_image" {
   assert {
     condition     = local.instances["g6.xlarge"].gpu == true
     error_message = "g6.xlarge deve ser gpu=true."
+  }
+  assert {
+    condition     = local.instances["g6.xlarge"].ami == data.aws_ami.gpu_x86.id
+    error_message = "g6.xlarge deve usar o AMI GPU."
   }
 }
