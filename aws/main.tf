@@ -32,10 +32,10 @@ module "ssm_secrets" {
   s3_secret_access_key = module.iam_s3.iam_secret_access_key
 }
 
-# 5. ECR — repositórios de imagem para os 3 serviços container.
+# 5. ECR — repositórios de imagem para os 3 serviços container + orquestrador (Plano 2).
 module "ecr" {
   source           = "./modules/ecr"
-  repository_names = ["vod-ingest", "vod-distribution", "vod-transcode"]
+  repository_names = ["vod-ingest", "vod-distribution", "vod-transcode", "vod-benchmark-orchestrator"]
 }
 
 # 6. Lambda do ingest (Event Gateway).
@@ -146,7 +146,23 @@ module "transcode_benchmark_harness" {
   ecr_image_gpu = "${module.ecr.repository_urls["vod-transcode"]}-gpu:latest"
 }
 
-# 12. Observability — CloudWatch dashboard + alarms (Plan 2 Phase A).
+# 12. Benchmark trigger — orquestrador Lambda com IAM escopada + watchdog (Plano 2).
+# Desligado por padrão (count = 0); habilitado quando enable_transcode_benchmark_harness = true.
+# Requer que o módulo transcode_benchmark_harness[0] exista (instância profile para PassRole).
+module "benchmark_trigger" {
+  count  = var.enable_transcode_benchmark_harness ? 1 : 0
+  source = "./modules/benchmark-trigger"
+
+  image_uri                      = "${module.ecr.repository_urls["vod-benchmark-orchestrator"]}:latest"
+  benchmark_instance_profile_arn = module.transcode_benchmark_harness[0].instance_profile_arn
+  benchmark_role_arn             = module.transcode_benchmark_harness[0].instance_role_arn
+  benchmark_subnet_id            = module.network.public_subnet_ids[0]
+  state_bucket                   = "vod-tfstate-prod-use2"
+  corpus_bucket                  = module.storage_s3.bucket_id
+  allowed_instance_types         = var.benchmark_instance_types
+}
+
+# 13. Observability — CloudWatch dashboard + alarms (Plan 2 Phase A).
 module "observability" {
   source    = "./modules/observability"
   providers = { aws.us_east_1 = aws.us_east_1 }
