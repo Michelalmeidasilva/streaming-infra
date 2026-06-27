@@ -14,15 +14,15 @@ aws ecr get-login-password --region "$REGION" | docker login --username AWS --pa
 docker pull "${image}"
 
 docker run --rm ${gpu_flag} \
-  -e BENCHMARK_SESSION_ID=${session_id} \
-  -e BENCHMARK_MACHINE_LABEL=${machine_label} \
-  -e BENCHMARK_CODECS=${codecs} \
-  -e BENCHMARK_RESOLUTIONS=${resolutions} \
-  -e BENCHMARK_REPEATS=${repeats} \
-  -e BENCHMARK_MODE=${mode} \
-  -e BENCHMARK_CORPUS_BUCKET=${corpus_bucket} \
-  -e BENCHMARK_CORPUS_PREFIX=${corpus_prefix} \
-  -e INGEST_BENCHMARK_URL=${ingest_url} \
+  -e BENCHMARK_SESSION_ID="${session_id}" \
+  -e BENCHMARK_MACHINE_LABEL="${machine_label}" \
+  -e BENCHMARK_CODECS="${codecs}" \
+  -e BENCHMARK_RESOLUTIONS="${resolutions}" \
+  -e BENCHMARK_REPEATS="${repeats}" \
+  -e BENCHMARK_MODE="${mode}" \
+  -e BENCHMARK_CORPUS_BUCKET="${corpus_bucket}" \
+  -e BENCHMARK_CORPUS_PREFIX="${corpus_prefix}" \
+  -e INGEST_BENCHMARK_URL="${ingest_url}" \
   "${image}" benchmark || true
 
 # Self-terminate (reforça instance_initiated_shutdown_behavior=terminate)

@@ -13,8 +13,12 @@ variables {
 run "userdata_sets_session_env" {
   command = plan
   assert {
-    condition     = can(regex("BENCHMARK_SESSION_ID=123e4567-e89b-42d3-a456-426614174000", local.user_data["c5.xlarge"]))
+    condition     = can(regex("BENCHMARK_SESSION_ID=\"123e4567-e89b-42d3-a456-426614174000\"", local.user_data["c5.xlarge"]))
     error_message = "user-data deve exportar BENCHMARK_SESSION_ID."
+  }
+  assert {
+    condition     = can(regex("INGEST_BENCHMARK_URL=\"http://ingest.internal/api/v1\"", local.user_data["c5.xlarge"]))
+    error_message = "user-data deve exportar INGEST_BENCHMARK_URL."
   }
 }
 
