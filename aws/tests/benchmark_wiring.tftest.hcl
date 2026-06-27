@@ -1,11 +1,11 @@
+# NOTA (CI): este teste usa `command = plan` contra o root completo, que inclui
+# data sources AWS de outros módulos (ex.: AMI lookups). Portanto exige
+# credenciais AWS de leitura válidas + acesso a us-east-2 para rodar. Em CI sem
+# credenciais, use `terraform -chdir=aws validate` como gate; este teste é
+# credential-gated (rodar no job que tenha AWS_* de leitura).
+#
 # Teste de wiring: garante que o módulo transcode_benchmark_harness nasce desligado
 # (count=0) por padrão no root, sem exigir nenhuma variável de benchmark.
-#
-# LIMITAÇÃO CONHECIDA: este teste usa `command = plan` no root completo (11+ módulos),
-# que depende de data sources da AWS (AMIs, etc.) resolvíveis apenas com credenciais
-# válidas e acesso à região us-east-2. Se falhar por data source de outro módulo, rode:
-#   terraform -chdir=aws validate   (prova a correção sintática/semântica sem plan)
-# O validate passou com sucesso — veja task-7-report.md para detalhes.
 
 variables {
   # Vars obrigatórias sem default (usadas pelos demais módulos do root).
