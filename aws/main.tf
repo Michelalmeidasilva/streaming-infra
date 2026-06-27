@@ -121,6 +121,31 @@ output "iam_access_key_id" {
   value = module.iam_s3.iam_access_key_id
 }
 
+# 12. Benchmark harness (Plano 1 — desligado por padrão; ativado pelo orquestrador).
+# Nota: ecr_image_gpu usa sufixo "-gpu" construído a partir do repo vod-transcode;
+# não há repositório ECR separado para GPU — o tag de imagem distingue CPUs de GPUs.
+module "transcode_benchmark_harness" {
+  count  = var.enable_transcode_benchmark_harness ? 1 : 0
+  source = "./modules/transcode-benchmark-harness"
+
+  benchmark_instance_types = var.benchmark_instance_types
+  benchmark_session_id     = var.benchmark_session_id
+  codecs                   = var.benchmark_codecs
+  resolutions              = var.benchmark_resolutions
+  repeats                  = var.benchmark_repeats
+  mode                     = var.benchmark_mode
+
+  corpus_bucket        = module.storage_s3.bucket_id
+  corpus_prefix        = "benchmark/corpus/"
+  ingest_benchmark_url = module.ingest_lambda.function_url
+
+  vpc_id    = module.network.vpc_id
+  subnet_id = module.network.public_subnet_ids[0]
+
+  ecr_image_cpu = "${module.ecr.repository_urls["vod-transcode"]}:latest"
+  ecr_image_gpu = "${module.ecr.repository_urls["vod-transcode"]}-gpu:latest"
+}
+
 # 11. Observability — CloudWatch dashboard + alarms (Plan 2 Phase A).
 module "observability" {
   source    = "./modules/observability"

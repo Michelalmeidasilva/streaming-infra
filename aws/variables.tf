@@ -48,3 +48,41 @@ variable "redis_url" {
   description = "URL do Redis externo (cache existente)."
   sensitive   = true
 }
+
+# --- Benchmark harness (Plano 1 — desligado por padrão) ---
+
+variable "enable_transcode_benchmark_harness" {
+  type        = bool
+  default     = false
+  description = "Ativa o módulo de frota de benchmark (controlado pelo orquestrador)."
+}
+
+variable "benchmark_instance_types" {
+  type    = list(string)
+  default = []
+}
+
+variable "benchmark_session_id" {
+  type    = string
+  default = "00000000-0000-4000-8000-000000000000"
+}
+
+variable "benchmark_codecs" {
+  type    = list(string)
+  default = ["h264"]
+}
+
+variable "benchmark_resolutions" {
+  type    = string
+  default = "1280x720:2800,1920x1080:5000"
+}
+
+variable "benchmark_repeats" {
+  type    = number
+  default = 3
+}
+
+variable "benchmark_mode" {
+  type    = string
+  default = "throughput"
+}
