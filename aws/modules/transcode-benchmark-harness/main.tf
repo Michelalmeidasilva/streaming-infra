@@ -10,8 +10,9 @@ resource "aws_instance" "benchmark" {
   user_data                            = local.user_data[each.key]
 
   metadata_options {
-    http_tokens   = "required" # IMDSv2 obrigatório (machine label via IMDSv2)
-    http_endpoint = "enabled"
+    http_tokens                 = "required" # IMDSv2 como baseline de segurança (harness pode consultá-lo para instance type)
+    http_endpoint               = "enabled"
+    http_put_response_hop_limit = 2 # hop-limit 2 permite que o container docker bridge alcance 169.254.169.254
   }
 
   root_block_device {

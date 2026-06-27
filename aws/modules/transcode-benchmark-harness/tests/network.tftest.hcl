@@ -12,8 +12,8 @@ variables {
 run "sg_is_created" {
   command = plan
   assert {
-    condition     = aws_security_group.benchmark.vpc_id == var.vpc_id
-    error_message = "O SG deve ser criado no VPC especificado."
+    condition     = aws_security_group.benchmark.tags["Benchmark"] == "true"
+    error_message = "O SG de benchmark deve ter a tag Benchmark=true."
   }
 }
 

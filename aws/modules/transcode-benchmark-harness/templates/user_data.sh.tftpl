@@ -1,5 +1,6 @@
 #!/bin/bash
 set -euxo pipefail
+trap 'shutdown -h now' EXIT
 
 # Garante docker (AL2023). Na AMI GPU (ECS-optimized) docker já vem instalado.
 if ! command -v docker >/dev/null 2>&1; then
@@ -24,6 +25,3 @@ docker run --rm ${gpu_flag} \
   -e BENCHMARK_CORPUS_PREFIX="${corpus_prefix}" \
   -e INGEST_BENCHMARK_URL="${ingest_url}" \
   "${image}" benchmark || true
-
-# Self-terminate (reforça instance_initiated_shutdown_behavior=terminate)
-shutdown -h now

@@ -49,3 +49,15 @@ run "instance_type_matches_key" {
     error_message = "instance_type deve casar com a chave do for_each."
   }
 }
+
+run "instances_security_posture" {
+  command = plan
+  assert {
+    condition     = alltrue([for i in aws_instance.benchmark : i.metadata_options[0].http_tokens == "required"])
+    error_message = "IMDSv2 (http_tokens=required) deve estar imposto em toda instância."
+  }
+  assert {
+    condition     = alltrue([for i in aws_instance.benchmark : i.root_block_device[0].encrypted == true])
+    error_message = "O root volume deve ser encriptado em toda instância."
+  }
+}

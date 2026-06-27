@@ -122,8 +122,8 @@ output "iam_access_key_id" {
 }
 
 # 11. Benchmark harness (Plano 1 — desligado por padrão; ativado pelo orquestrador).
-# Nota: ecr_image_gpu usa sufixo "-gpu" construído a partir do repo vod-transcode;
-# não há repositório ECR separado para GPU — o tag de imagem distingue CPUs de GPUs.
+# GPU usa um repositório ECR separado 'vod-transcode-gpu' (criado no Plano 2 — o módulo ecr ainda não o cria;
+# habilitar tipos GPU exige esse repo).
 module "transcode_benchmark_harness" {
   count  = var.enable_transcode_benchmark_harness ? 1 : 0
   source = "./modules/transcode-benchmark-harness"
