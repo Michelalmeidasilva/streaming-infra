@@ -12,12 +12,12 @@ variables {
 run "instance_role_assumed_by_ec2" {
   command = plan
   assert {
-    condition     = can(regex("ec2.amazonaws.com", aws_iam_role.benchmark.assume_role_policy))
+    condition     = can(regex("ec2\\.amazonaws\\.com", aws_iam_role.benchmark.assume_role_policy))
     error_message = "A role da instância deve ser assumível por ec2.amazonaws.com."
   }
 }
 
-run "instance_profile_wraps_role" {
+run "instance_policy_grants_corpus_read" {
   command = plan
 
   # NOTE: aws_iam_instance_profile.benchmark.role == aws_iam_role.benchmark.name não pode
