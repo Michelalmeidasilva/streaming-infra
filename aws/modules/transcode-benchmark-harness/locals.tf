@@ -24,4 +24,21 @@ locals {
       )
     }
   }
+
+  user_data = {
+    for t, cfg in local.instances : t => templatefile("${path.module}/templates/user_data.sh.tftpl", {
+      region        = data.aws_region.current.name
+      image         = cfg.image
+      gpu_flag      = cfg.gpu ? "--gpus all" : ""
+      session_id    = var.benchmark_session_id
+      machine_label = t
+      codecs        = join(",", var.codecs)
+      resolutions   = var.resolutions
+      repeats       = var.repeats
+      mode          = var.mode
+      corpus_bucket = var.corpus_bucket
+      corpus_prefix = var.corpus_prefix
+      ingest_url    = var.ingest_benchmark_url
+    })
+  }
 }
