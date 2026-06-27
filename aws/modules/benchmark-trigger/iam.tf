@@ -52,11 +52,11 @@ data "aws_iam_policy_document" "orchestrator" {
       values   = ["RunInstances"]
     }
   }
-  # PassRole SÓ do instance profile do benchmark (converte instance-profile/ → role/)
+  # PassRole SÓ para a role de benchmark (ARN real, não derivado do instance-profile)
   statement {
     sid       = "PassBenchmarkRole"
     actions   = ["iam:PassRole"]
-    resources = [replace(var.benchmark_instance_profile_arn, ":instance-profile/", ":role/")]
+    resources = [var.benchmark_role_arn]
   }
   statement {
     sid       = "PassBenchmarkProfile"

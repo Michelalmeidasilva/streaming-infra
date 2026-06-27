@@ -23,9 +23,18 @@ variable "corpus_bucket" {
   description = "Nome do bucket S3 que contém o corpus de vídeos para benchmark."
 }
 
+variable "benchmark_role_arn" {
+  type        = string
+  description = "ARN da role da EC2 de benchmark (para iam:PassRole) — output instance_role_arn do módulo transcode-benchmark-harness."
+}
+
 variable "allowed_instance_types" {
   type        = list(string)
   description = "Lista de tipos de instância EC2 permitidos pelo orquestrador (allowlist de segurança)."
+  validation {
+    condition     = length(var.allowed_instance_types) > 0
+    error_message = "allowed_instance_types não pode ser vazio (RunInstances negaria tudo silenciosamente)."
+  }
 }
 
 variable "ttl_hours" {

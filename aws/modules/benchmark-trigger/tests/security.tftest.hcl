@@ -1,6 +1,7 @@
 variables {
   image_uri                      = "111122223333.dkr.ecr.us-east-2.amazonaws.com/vod-benchmark-orchestrator:latest"
   benchmark_instance_profile_arn = "arn:aws:iam::111122223333:instance-profile/vod-bench-ec2"
+  benchmark_role_arn             = "arn:aws:iam::111122223333:role/vod-bench-ec2"
   benchmark_subnet_id            = "subnet-0123456789abcdef0"
   state_bucket                   = "vod-tfstate-prod-use2"
   corpus_bucket                  = "vod-streaming-upload-dev"
@@ -29,9 +30,15 @@ run "run_instances_restricted_to_allowlist" {
 
 run "passrole_scoped_to_benchmark_profile" {
   command = plan
+  # GetInstanceProfile ainda usa instance-profile ARN (verificação de existência antes do lançamento)
   assert {
     condition     = can(regex("instance-profile/vod-bench-ec2", data.aws_iam_policy_document.orchestrator.json))
-    error_message = "iam:PassRole deve ser restrito ao instance profile do benchmark."
+    error_message = "iam:GetInstanceProfile deve referenciar o ARN do instance profile do benchmark."
+  }
+  # PassRole deve referenciar o ARN real da role (não derivado do instance-profile)
+  assert {
+    condition     = can(regex("role/vod-bench-ec2", data.aws_iam_policy_document.orchestrator.json))
+    error_message = "iam:PassRole deve referenciar o ARN da role de benchmark."
   }
 }
 

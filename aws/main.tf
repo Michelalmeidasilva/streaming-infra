@@ -155,6 +155,7 @@ module "benchmark_trigger" {
 
   image_uri                      = "${module.ecr.repository_urls["vod-benchmark-orchestrator"]}:latest"
   benchmark_instance_profile_arn = module.transcode_benchmark_harness[0].instance_profile_arn
+  benchmark_role_arn             = module.transcode_benchmark_harness[0].instance_role_arn
   benchmark_subnet_id            = module.network.public_subnet_ids[0]
   state_bucket                   = "vod-tfstate-prod-use2"
   corpus_bucket                  = module.storage_s3.bucket_id
