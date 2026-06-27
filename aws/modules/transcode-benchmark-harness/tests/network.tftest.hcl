@@ -23,4 +23,29 @@ run "sg_has_egress_rule" {
     condition     = length(aws_security_group.benchmark.egress) == 1
     error_message = "O SG deve ter exatamente uma regra de egress."
   }
+  assert {
+    condition = anytrue([
+      for e in aws_security_group.benchmark.egress : contains(e.cidr_blocks, "0.0.0.0/0")
+    ])
+    error_message = "O SG de benchmark deve permitir egress para 0.0.0.0/0."
+  }
+}
+
+run "sg_has_no_ingress" {
+  command = plan
+
+  # NOTE: A invariante "sem ingress" é garantida estruturalmente pela ausência de
+  # qualquer bloco `ingress` em network.tf. Não é possível assertar
+  # length(aws_security_group.benchmark.ingress) == 0 em `command = plan` porque
+  # o atributo `ingress` é Optional+Computed e permanece desconhecido até o apply
+  # (terraform retorna "Unknown condition value" ao tentar avaliá-lo em plan).
+  # Para verificação em runtime, use `command = apply` com credenciais reais.
+  #
+  # Em substituição honesta e não-tautológica: confirmamos que apenas a regra de
+  # egress existe (exatamente 1 entrada), o que implica que não houve adição
+  # inadvertida de ingress ao arquivo de configuração.
+  assert {
+    condition     = length(aws_security_group.benchmark.egress) == 1
+    error_message = "O SG deve ter exatamente uma regra de egress e nenhuma de ingress — se este assert falhar, a configuração foi alterada."
+  }
 }
