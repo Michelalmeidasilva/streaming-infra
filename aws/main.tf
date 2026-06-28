@@ -162,6 +162,39 @@ module "benchmark_trigger" {
   allowed_instance_types         = var.benchmark_instance_types
 }
 
+# 12b. IAM inline policy: permite que a identidade COMPARTILHADA vod-storage-svc invoque
+# a Function URL do orquestrador de benchmark (lambda:InvokeFunctionUrl) via SigV4/AWS_IAM.
+#
+# IMPORTANTE — identidade compartilhada:
+#   A identidade `vod-storage-svc` (module.iam_s3) é também usada pelo serviço distribution
+#   para acesso ao S3. Quando o benchmark está habilitado, a distribution tecnicamente ganha
+#   esse invoke também. Não há dependência circular: module.iam_s3 não depende de
+#   module.benchmark_trigger.
+#
+# TODO (hardening futuro): criar uma identidade dedicada para o platform-upload separada
+#   da identity de distribuição, de modo que a concessão de invoke fique escopada apenas
+#   ao serviço que realmente precisa disparar o benchmark.
+resource "aws_iam_user_policy" "benchmark_invoke" {
+  count = var.enable_transcode_benchmark_harness ? 1 : 0
+  name  = "vod-benchmark-invoke"
+  user  = module.iam_s3.user_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid      = "InvokeBenchmarkOrchestrator"
+      Effect   = "Allow"
+      Action   = "lambda:InvokeFunctionUrl"
+      Resource = module.benchmark_trigger[0].function_arn
+      Condition = {
+        StringEquals = {
+          "lambda:FunctionUrlAuthType" = "AWS_IAM"
+        }
+      }
+    }]
+  })
+}
+
 # 13. Observability — CloudWatch dashboard + alarms (Plan 2 Phase A).
 module "observability" {
   source    = "./modules/observability"
