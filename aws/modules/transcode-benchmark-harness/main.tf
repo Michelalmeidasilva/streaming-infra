@@ -244,13 +244,17 @@ resource "aws_instance" "benchmark" {
       -e BENCHMARK_QUALITY_POINTS="${var.quality_points}" \
       -e INGEST_BENCHMARK_URL="${var.ingest_benchmark_url}" \
       -e BENCHMARK_MACHINE_LABEL="${var.machine_label}" \
+      -e BENCHMARK_SESSION_ID="${var.benchmark_session_id}" \
       -e TRANSCODE_ENCODER_BACKEND="${local.encoder_backend}" \
       "${var.image_uri}" benchmark
   EOT
 
   tags = merge(var.tags, {
-    Name    = "vod-transcode-benchmark-${each.value}"
-    Role    = "transcode-benchmark"
-    purpose = "benchmark"
+    Name         = "vod-transcode-benchmark-${each.value}"
+    Role         = "transcode-benchmark"
+    purpose      = "benchmark"
+    Benchmark    = "true"
+    SessionId    = var.benchmark_session_id
+    MachineLabel = each.value
   })
 }

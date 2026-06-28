@@ -96,6 +96,12 @@ variable "ssm_parameter_arns" {
   type        = list(string)
 }
 
+variable "benchmark_session_id" {
+  type        = string
+  default     = ""
+  description = "UUID que correlaciona o run de benchmark (vira tag SessionId + env BENCHMARK_SESSION_ID). Vazio = sem correlação."
+}
+
 variable "tags" {
   description = "Additional tags to merge onto resources."
   type        = map(string)

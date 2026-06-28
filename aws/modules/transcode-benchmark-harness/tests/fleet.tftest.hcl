@@ -61,3 +61,15 @@ run "rejects_empty_both" {
     instance_types = []
   }
 }
+
+run "instances_carry_session_tags" {
+  command = plan
+  variables {
+    instance_types       = ["c5.xlarge"]
+    benchmark_session_id = "123e4567-e89b-42d3-a456-426614174000"
+  }
+  assert {
+    condition     = aws_instance.benchmark["c5.xlarge"].tags["Benchmark"] == "true" && aws_instance.benchmark["c5.xlarge"].tags["SessionId"] == "123e4567-e89b-42d3-a456-426614174000" && aws_instance.benchmark["c5.xlarge"].tags["MachineLabel"] == "c5.xlarge"
+    error_message = "Instância deve carregar tags de correlação Benchmark/SessionId/MachineLabel."
+  }
+}
