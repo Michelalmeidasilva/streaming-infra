@@ -3,33 +3,21 @@
 # "platform-upload identity must hold ONLY lambda:InvokeFunctionUrl on the orchestrator
 # function — NEVER EC2 permissions".
 #
-# EXPLORAÇÃO (Task 7): o módulo iam-s3 é a única identidade IAM do platform-upload
-# gerenciada por Terraform. Sua policy cobre exclusivamente ações S3 sobre o bucket
-# de upload. Não há outro módulo ou resource AWS criando um usuário/role para esse serviço.
+# EXPLORAÇÃO (Task 7 + Task 7 fix-invoke): o módulo iam-s3 cria UMA única policy inline
+# no usuário (`aws_iam_user_policy.s3_access`), gerada a partir de
+# `data.aws_iam_policy_document.s3_access`. A concessão de lambda:InvokeFunctionUrl é
+# injetada como segunda policy inline NO NÍVEL RAIZ (aws_iam_user_policy.benchmark_invoke,
+# count-gated), portanto este módulo continua com política exclusivamente S3.
 #
-# REQUISITO DEFERIDO AO DEPLOY — lambda:InvokeFunctionUrl:
-# A spec exige que o platform-upload possa invocar a Function URL do orquestrador
-# (benchmark-trigger). Essa concessão NÃO está neste módulo porque:
-#   1. O módulo benchmark_trigger usa count = 0 por padrão; seu ARN só existe quando
-#      enable_transcode_benchmark_harness = true — referenciar o ARN aqui criaria
-#      dependência circular/referência nula na configuração raiz.
-#   2. A injeção de uma policy condicional (if count > 0) não é suportada nativamente
-#      em Terraform sem meta-argumentos complexos que tornariam a config frágil.
-# AÇÃO DE DEPLOY OBRIGATÓRIA: ao ativar o benchmark, um operador DEVE adicionar
-# manualmente (ou via script pós-apply) a seguinte policy ao usuário vod-storage-svc:
-#
-#   {
-#     "Effect": "Allow",
-#     "Action": "lambda:InvokeFunctionUrl",
-#     "Resource": "<ARN da function_url do módulo benchmark_trigger[0]>",
-#     "Condition": { "StringEquals": { "lambda:FunctionUrlAuthType": "AWS_IAM" } }
-#   }
-#
-# Esse requisito deve constar no runbook de deploy do benchmark (RUNBOOK.md §benchmark).
+# ASSUNÇÃO DE SINGLE-POLICY: dentro deste módulo há apenas um `aws_iam_user_policy`
+# (`s3_access`). A asserção contra `data.aws_iam_policy_document.s3_access.json` cobre
+# integralmente o documento — `aws_iam_user_policy.s3_access.policy` é o mesmo JSON
+# renderizado. Adicionamos a asserção redundante no run "platform_upload_cannot_run_ec2"
+# para capturar qualquer discrepância futura entre o documento e a resource efetivada.
 #
 # RED reasoning:
 # - run "platform_upload_cannot_run_ec2": falharia imediatamente se qualquer ação "ec2:*"
-#   fosse adicionada ao bloco `actions` em main.tf.
+#   fosse adicionada ao bloco `actions` em main.tf (checado no doc E na resource efetivada).
 # - run "platform_upload_policy_is_s3_only": falharia se o SID ou s3:PutObject fossem
 #   removidos, indicando deriva na política mínima esperada.
 
@@ -42,7 +30,14 @@ run "platform_upload_cannot_run_ec2" {
 
   assert {
     condition     = !can(regex("ec2:", data.aws_iam_policy_document.s3_access.json))
-    error_message = "A policy do platform-upload NÃO pode conter permissões EC2 (ec2:*)."
+    error_message = "A policy do platform-upload NÃO pode conter permissões EC2 (ec2:*) — policy document."
+  }
+
+  # Asserção redundante contra a resource efetivada (aws_iam_user_policy.s3_access.policy).
+  # Garante que não há discrepância futura entre o doc fonte e o JSON aplicado ao usuário.
+  assert {
+    condition     = !can(regex("ec2:", aws_iam_user_policy.s3_access.policy))
+    error_message = "A policy inline efetivada no usuário NÃO pode conter permissões EC2 (ec2:*)."
   }
 }
 

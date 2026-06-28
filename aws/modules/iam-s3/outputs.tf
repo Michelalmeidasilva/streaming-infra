@@ -13,3 +13,8 @@ output "iam_user_arn" {
   description = "The ARN of the IAM User"
   value       = aws_iam_user.this.arn
 }
+
+output "user_name" {
+  description = "The name of the IAM User (used to attach additional inline policies at the root level)."
+  value       = aws_iam_user.this.name
+}

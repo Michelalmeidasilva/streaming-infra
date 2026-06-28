@@ -196,6 +196,35 @@ a URL é preservada.
 
 ---
 
+## Benchmark
+
+### Habilitando o harness de benchmark
+
+Para ativar a frota de benchmark, passe `enable_transcode_benchmark_harness = true` (e um
+`benchmark_instance_types` não-vazio, ex.: `["c5.2xlarge"]`) no `terraform.tfvars` e faça
+`terraform apply`.
+
+### Policy `vod-benchmark-invoke` (lambda:InvokeFunctionUrl)
+
+Quando `enable_transcode_benchmark_harness = true`, o Terraform provisiona automaticamente
+uma policy inline `vod-benchmark-invoke` no usuário `vod-storage-svc` (identidade
+compartilhada `vod-storage-svc` gerenciada pelo módulo `iam-s3`). Essa policy concede
+**exclusivamente** `lambda:InvokeFunctionUrl` na Function URL do orquestrador de benchmark
+(`module.benchmark_trigger[0].function_arn`), condicionado a `lambda:FunctionUrlAuthType =
+"AWS_IAM"` (SigV4 obrigatório — sem invoke anônimo).
+
+**Caveat de identidade compartilhada:** o usuário `vod-storage-svc` também é usado pelo
+serviço `streaming-distribution` para acesso ao S3. Isso significa que, quando o benchmark
+está habilitado, a distribution tecnicamente ganha a capacidade de invocar o orquestrador
+também. Esse escopo excessivo é aceitável no curto prazo.
+
+**TODO (hardening futuro):** criar uma identidade IAM dedicada para o `platform-upload`,
+separada da identidade de distribuição, de modo que a concessão de `lambda:InvokeFunctionUrl`
+fique escopada exclusivamente ao serviço que precisa disparar o benchmark. Registrado como
+`TODO` em `aws/main.tf` no recurso `aws_iam_user_policy.benchmark_invoke`.
+
+---
+
 ## Próximo passo documentado (não implementado)
 
 **CI/CD via GitHub Actions + OIDC:** assumir uma IAM Role federada (sem chave AWS no repo),
