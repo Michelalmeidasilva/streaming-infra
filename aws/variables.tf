@@ -143,3 +143,9 @@ variable "benchmark_quality_points" {
   type        = string
   default     = ""
 }
+
+variable "benchmark_instance_types" {
+  type        = list(string)
+  default     = []
+  description = "Frota de tipos p/ benchmark (allowlist do orquestrador + harness)."
+}

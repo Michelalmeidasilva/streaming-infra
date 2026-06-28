@@ -23,7 +23,7 @@ run "one_instance_per_type" {
     error_message = "Frota deve lançar 1 instância por tipo."
   }
   assert {
-    condition = aws_instance.benchmark["c5.xlarge"].instance_type == "c5.xlarge" && aws_instance.benchmark["c5.2xlarge"].instance_type == "c5.2xlarge"
+    condition     = aws_instance.benchmark["c5.xlarge"].instance_type == "c5.xlarge" && aws_instance.benchmark["c5.2xlarge"].instance_type == "c5.2xlarge"
     error_message = "Cada instância da frota deve ter o instance_type da sua chave."
   }
 }

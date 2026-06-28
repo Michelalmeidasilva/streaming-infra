@@ -35,7 +35,7 @@ module "ssm_secrets" {
 # 5. ECR — repositórios de imagem para os 3 serviços container.
 module "ecr" {
   source           = "./modules/ecr"
-  repository_names = ["vod-ingest", "vod-distribution", "vod-transcode", "vod-transcode-gpu"]
+  repository_names = ["vod-ingest", "vod-distribution", "vod-transcode", "vod-transcode-gpu", "vod-benchmark-orchestrator"]
 }
 
 # 6. Lambda do ingest (Event Gateway).
@@ -174,10 +174,11 @@ output "cost_guard_killswitch_function" {
 module "transcode_benchmark_harness" {
   source = "./modules/transcode-benchmark-harness"
 
-  enabled       = var.enable_transcode_benchmark_harness
-  instance_type = var.benchmark_instance_type
-  ami_arch      = var.benchmark_ami_arch
-  machine_label = var.benchmark_machine_label
+  enabled        = var.enable_transcode_benchmark_harness
+  instance_type  = var.benchmark_instance_type
+  instance_types = var.benchmark_instance_types
+  ami_arch       = var.benchmark_ami_arch
+  machine_label  = var.benchmark_machine_label
 
   gpu                  = var.benchmark_gpu
   encoder_backend      = var.benchmark_gpu ? "nvenc" : "software"
@@ -201,4 +202,47 @@ module "transcode_benchmark_harness" {
 output "benchmark_instance_id" {
   value       = module.transcode_benchmark_harness.instance_id
   description = "EC2 benchmark harness instance ID (null when disabled)."
+}
+
+# 14. Benchmark trigger — Lambda orquestrador (AuthType=AWS_IAM) + watchdog.
+# Count-gated: sem recursos adicionais quando a flag está false.
+module "benchmark_trigger" {
+  count  = var.enable_transcode_benchmark_harness ? 1 : 0
+  source = "./modules/benchmark-trigger"
+
+  image_uri                      = "${module.ecr.repository_urls["vod-benchmark-orchestrator"]}:latest"
+  benchmark_instance_profile_arn = module.transcode_benchmark_harness.instance_profile_arn
+  benchmark_role_arn             = module.transcode_benchmark_harness.instance_role_arn
+  benchmark_subnet_id            = module.network.public_subnet_ids[0]
+  state_bucket                   = "vod-tfstate-prod-use2"
+  corpus_bucket                  = module.storage_s3.bucket_id
+  allowed_instance_types         = var.benchmark_instance_types
+}
+
+# Permite ao vod-storage-svc invocar a Function URL do orquestrador via SigV4 IAM.
+# Identidade compartilhada — hardening futuro: identidade dedicada ao orquestrador.
+resource "aws_iam_user_policy" "benchmark_invoke" {
+  count = var.enable_transcode_benchmark_harness ? 1 : 0
+  name  = "vod-benchmark-invoke"
+  user  = module.iam_s3.user_name
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "InvokeBenchmarkOrchestrator"
+      Effect    = "Allow"
+      Action    = "lambda:InvokeFunctionUrl"
+      Resource  = module.benchmark_trigger[0].function_arn
+      Condition = { StringEquals = { "lambda:FunctionUrlAuthType" = "AWS_IAM" } }
+    }]
+  })
+}
+
+output "benchmark_function_url" {
+  value       = try(module.benchmark_trigger[0].function_url, null)
+  description = "URL da Function URL do orquestrador (null quando flag desabilitada)."
+}
+
+output "benchmark_function_arn" {
+  value       = try(module.benchmark_trigger[0].function_arn, null)
+  description = "ARN da Lambda do orquestrador (null quando flag desabilitada)."
 }
