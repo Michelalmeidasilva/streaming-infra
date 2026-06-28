@@ -4,6 +4,11 @@ locals {
   ami_id          = var.gpu ? data.aws_ami.gpu.id : data.aws_ami.al2023.id
   gpu_flag        = var.gpu ? "--gpus all" : ""
   encoder_backend = var.encoder_backend
+
+  # Fleet support: when instance_types is non-empty, launch one instance per
+  # type; otherwise fall back to the single instance_type (compat mode).
+  fleet     = length(var.instance_types) > 0 ? var.instance_types : [var.instance_type]
+  instances = var.enabled ? { for t in local.fleet : t => t } : {}
 }
 
 # ---- AMI lookup: Amazon Linux 2023 matching the requested architecture ----
@@ -164,9 +169,9 @@ resource "aws_iam_instance_profile" "benchmark" {
 # ---- EC2 instance — runs the benchmark container then self-terminates ----
 
 resource "aws_instance" "benchmark" {
-  count                                = local.count_n
+  for_each                             = local.instances
   ami                                  = local.ami_id
-  instance_type                        = var.instance_type
+  instance_type                        = each.value
   subnet_id                            = var.subnet_id
   vpc_security_group_ids               = [var.security_group_id]
   iam_instance_profile                 = aws_iam_instance_profile.benchmark[0].name
@@ -244,7 +249,7 @@ resource "aws_instance" "benchmark" {
   EOT
 
   tags = merge(var.tags, {
-    Name    = "vod-transcode-benchmark-${var.instance_type}"
+    Name    = "vod-transcode-benchmark-${each.value}"
     Role    = "transcode-benchmark"
     purpose = "benchmark"
   })

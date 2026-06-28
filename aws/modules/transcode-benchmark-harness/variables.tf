@@ -5,8 +5,15 @@ variable "enabled" {
 }
 
 variable "instance_type" {
-  description = "EC2 instance type to benchmark (e.g. c5.xlarge for x86_64, c7g.xlarge for arm64)."
+  description = "EC2 instance type to benchmark (e.g. c5.xlarge for x86_64, c7g.xlarge for arm64). Used when instance_types is empty (single-instance / compat mode)."
   type        = string
+  default     = ""
+}
+
+variable "instance_types" {
+  description = "Frota: se não-vazio, lança uma instância por tipo; senão usa instance_type (compat). Default [] preserva modo single-instance."
+  type        = list(string)
+  default     = []
 }
 
 variable "ami_arch" {
