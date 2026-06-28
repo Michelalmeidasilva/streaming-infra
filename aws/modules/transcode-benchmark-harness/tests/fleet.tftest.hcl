@@ -22,6 +22,10 @@ run "one_instance_per_type" {
     condition     = length(aws_instance.benchmark) == 2
     error_message = "Frota deve lançar 1 instância por tipo."
   }
+  assert {
+    condition = aws_instance.benchmark["c5.xlarge"].instance_type == "c5.xlarge" && aws_instance.benchmark["c5.2xlarge"].instance_type == "c5.2xlarge"
+    error_message = "Cada instância da frota deve ter o instance_type da sua chave."
+  }
 }
 
 run "single_instance_compat" {
@@ -33,5 +37,27 @@ run "single_instance_compat" {
   assert {
     condition     = length(aws_instance.benchmark) == 1
     error_message = "Sem instance_types, cai no single instance_type."
+  }
+}
+
+run "fleet_without_single_instance_type" {
+  command = plan
+  variables {
+    instance_type  = ""
+    instance_types = ["c7g.xlarge"]
+  }
+  assert {
+    condition     = length(aws_instance.benchmark) == 1
+    error_message = "Frota deve funcionar sem instance_type definido."
+  }
+}
+
+run "rejects_empty_both" {
+  command         = plan
+  expect_failures = [var.instance_type]
+  variables {
+    enabled        = true
+    instance_type  = ""
+    instance_types = []
   }
 }

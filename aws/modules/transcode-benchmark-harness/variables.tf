@@ -8,6 +8,10 @@ variable "instance_type" {
   description = "EC2 instance type to benchmark (e.g. c5.xlarge for x86_64, c7g.xlarge for arm64). Used when instance_types is empty (single-instance / compat mode)."
   type        = string
   default     = ""
+  validation {
+    condition     = var.instance_type != "" || length(var.instance_types) > 0
+    error_message = "Defina instance_type (single) ou instance_types (frota); ambos não podem ser vazios."
+  }
 }
 
 variable "instance_types" {

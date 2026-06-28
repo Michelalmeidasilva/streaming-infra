@@ -1,6 +1,6 @@
 output "instance_id" {
   value       = try(values(aws_instance.benchmark)[0].id, null)
-  description = "Benchmark harness instance ID for the first instance (null when disabled). For fleet runs, use instance_ids."
+  description = "Benchmark harness instance ID (lexicographically-first instance; null when disabled). For fleet runs, use instance_ids."
 }
 
 output "instance_ids" {
