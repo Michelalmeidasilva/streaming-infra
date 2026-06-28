@@ -231,7 +231,7 @@ resource "aws_iam_user_policy" "benchmark_invoke" {
       Sid       = "InvokeBenchmarkOrchestrator"
       Effect    = "Allow"
       Action    = "lambda:InvokeFunctionUrl"
-      Resource  = module.benchmark_trigger[0].function_arn
+      Resource  = try(module.benchmark_trigger[0].function_arn, "")
       Condition = { StringEquals = { "lambda:FunctionUrlAuthType" = "AWS_IAM" } }
     }]
   })
