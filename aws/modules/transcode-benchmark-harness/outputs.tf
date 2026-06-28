@@ -1,14 +1,4 @@
-output "instance_profile_arn" {
-  description = "ARN do instance profile (para PassRole do orquestrador)."
-  value       = aws_iam_instance_profile.benchmark.arn
-}
-
-output "instance_role_arn" {
-  description = "ARN da role da EC2 de benchmark."
-  value       = aws_iam_role.benchmark.arn
-}
-
-output "instance_ids" {
-  description = "Mapa tipo -> instance id."
-  value       = { for k, i in aws_instance.benchmark : k => i.id }
+output "instance_id" {
+  value       = try(aws_instance.benchmark[0].id, null)
+  description = "Benchmark harness instance ID (null when disabled)."
 }

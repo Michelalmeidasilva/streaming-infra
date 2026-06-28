@@ -1,7 +1,7 @@
 # CloudWatch Observability — Dev (moto) + Prod (AWS CloudWatch)
 
 > **Versão:** 2026-06-06
-> **Planos de referência:** `docs/design-docs/plans/2026-06-06-infra-cloudwatch-observability.md` (Plan 2) e `docs/design-docs/specs/2026-06-06-cloudwatch-observability-migration-design.md`
+> **Planos de referência:** `docs/superpowers/plans/2026-06-06-infra-cloudwatch-observability.md` (Plan 2) e `docs/superpowers/specs/2026-06-06-cloudwatch-observability-migration-design.md`
 
 ---
 
@@ -98,7 +98,7 @@ Ambos os Lambdas usam `package_type = "Image"`. A camada do Lambda Insights **n�
 
 ### O que está planejado (não construído)
 
-O módulo Terraform `infra/aws/modules/observability` — que incluiria o dashboard CloudWatch, os alarms (Lambda errors/p95, CloudFront 5xx) e o filtro de log para memória Lambda — está **especificado no plano A2–A4** (`docs/design-docs/plans/2026-06-06-infra-cloudwatch-observability.md`) mas foi **adiado** porque o binário `terraform` não está disponível neste ambiente (impossível validar). Não execute `terraform apply` até que esse módulo seja implementado.
+O módulo Terraform `infra/aws/modules/observability` — que incluiria o dashboard CloudWatch, os alarms (Lambda errors/p95, CloudFront 5xx) e o filtro de log para memória Lambda — está **especificado no plano A2–A4** (`docs/superpowers/plans/2026-06-06-infra-cloudwatch-observability.md`) mas foi **adiado** porque o binário `terraform` não está disponível neste ambiente (impossível validar). Não execute `terraform apply` até que esse módulo seja implementado.
 
 Itens planejados (A2–A4):
 
@@ -110,8 +110,8 @@ Itens planejados (A2–A4):
 
 ## Referências
 
-- Spec de design: `infra/docs/design-docs/specs/2026-06-06-cloudwatch-observability-migration-design.md`
-- Plano de implementação: `infra/docs/design-docs/plans/2026-06-06-infra-cloudwatch-observability.md`
+- Spec de design: `infra/docs/superpowers/specs/2026-06-06-cloudwatch-observability-migration-design.md`
+- Plano de implementação: `infra/docs/superpowers/plans/2026-06-06-infra-cloudwatch-observability.md`
 - Spike LocalStack vs moto: `infra/observability/SPIKE-localstack-emf.md`
 - Datasource Grafana dev: `infra/observability/grafana-datasources.cloudwatch.yaml`
 - Dashboard Grafana: `infra/observability/dashboards/vod-golden-signals.json`

@@ -1,15 +1,2 @@
 bin/
-
-# Segredos e configuração local (nunca versionar)
-.env
-.env.*
-!.env.example
-
-# Lixo de SO / artefatos
-.DS_Store
-*.zip
-*.backup
-
-# Chaves
-*.pem
-*.key
+.superpowers/

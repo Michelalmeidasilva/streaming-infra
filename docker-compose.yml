@@ -7,13 +7,13 @@ services:
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USERNAME:-admin}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD:-password}
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
     volumes:
       - mongodb_data:/data/db
     healthcheck:
       test: >
-        mongosh --username ${MONGODB_USERNAME:-admin} --password ${MONGODB_PASSWORD:-password}
+        mongosh --username admin --password password
         --authenticationDatabase admin
         --eval 'db.runCommand({ ping: 1 })' --quiet
       interval: 10s
@@ -34,8 +34,8 @@ services:
       - "15672:15672"    # Management UI port (http://localhost:15672 - guest/guest)
       - "15692:15692"    # Prometheus metrics
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-guest}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
       - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
@@ -71,8 +71,8 @@ services:
       - "9000:9000"      # MinIO S3 API port
       - "9001:9001"      # MinIO Console port (http://localhost:9001 - admin/password123)
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-password123}
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password123
     volumes:
       - minio_data:/data
     healthcheck:
@@ -92,7 +92,7 @@ services:
     entrypoint: >
       /bin/sh -c "
       echo 'Setting up MinIO client...';
-      /usr/bin/mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-admin} ${MINIO_ROOT_PASSWORD:-password123};
+      /usr/bin/mc alias set local http://minio:9000 admin password123;
       echo 'Creating videos bucket...';
       /usr/bin/mc mb local/videos || true;
       echo 'Applying MinIO CORS policy...';
@@ -115,12 +115,12 @@ services:
     env_file:
       - ../streaming-ingest/.env
     environment:
-      MONGODB_URI: mongodb://${MONGODB_USERNAME:-admin}:${MONGODB_PASSWORD:-password}@mongodb:27017/streaming?authSource=admin
-      RABBITMQ_URL: amqp://${RABBITMQ_USERNAME:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672/
+      MONGODB_URI: mongodb://admin:password@mongodb:27017/streaming?authSource=admin
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       SERVER_PORT: 8080
       MINIO_ENDPOINT: minio:9000
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-password123}
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password123
     extra_hosts:
       - "localhost:host-gateway"
     depends_on:
@@ -140,7 +140,7 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_E2E_AUTH_ENABLED: "1"
-        NEXT_PUBLIC_E2E_ADMIN_EMAIL: ${E2E_ADMIN_EMAIL:-admin@local.dev}
+        NEXT_PUBLIC_E2E_ADMIN_EMAIL: admin@local.dev
         NEXT_PUBLIC_STORAGE_DIRECT_UPLOAD_ENABLED: "false"
         # Must match UPLOAD_MAX_FILE_SIZE_GB in .env — NEXT_PUBLIC_* is inlined
         # into the client bundle at build time, so env_file alone won't raise it.
@@ -164,14 +164,18 @@ services:
       # Browser-facing base for object URLs (e.g. thumbnails). Must be the
       # host-published URL, since the browser cannot resolve the `minio` DNS name.
       MINIO_PUBLIC_ENDPOINT: http://localhost:9000
-      RABBITMQ_URL: amqp://${RABBITMQ_USERNAME:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672/
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       # Enable the E2E auth bypass server-side to match the client build args
       # (NEXT_PUBLIC_E2E_* are baked at build time above). The guard in
       # lib/auth/e2e.ts still blocks this when NODE_ENV=production at runtime, so
       # it only applies to this local/dev stack. Sign in / cookie email is
       # admin@local.dev → ADMIN.
       E2E_AUTH_ENABLED: "1"
-      E2E_ADMIN_EMAIL: ${E2E_ADMIN_EMAIL:-admin@local.dev}
+      E2E_ADMIN_EMAIL: admin@local.dev
+      # Distribution load-test data source (scalestore-api). Runs on the HOST
+      # (bench/scale/store: `go run ./cmd/scalestore-api`), so reach it via the
+      # Docker Desktop host gateway. Server-side var read by /api/distribution-runs.
+      SCALESTORE_API_URL: http://host.docker.internal:8090
       # STORAGE_PROVIDER: minio
       # STORAGE_BUCKET: videos
       # MINIO_ACCESS_KEY: admin
@@ -214,13 +218,13 @@ services:
       - ../streaming-distribution/.env
     environment:
       SERVER_PORT: 8082
-      MONGODB_URI: mongodb://${MONGODB_USERNAME:-admin}:${MONGODB_PASSWORD:-password}@mongodb:27017/streaming?authSource=admin
+      MONGODB_URI: mongodb://admin:password@mongodb:27017/streaming?authSource=admin
       REDIS_URL: redis://redis:6379
       STORAGE_PROVIDER: minio
       STORAGE_BUCKET: videos
       MINIO_ENDPOINT: minio:9000
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-password123}
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password123
       # Public URL mode: browser plays manifests directly from MinIO; relative
       # child playlists/segments resolve because the bucket is public-read.
       CDN_BASE: http://localhost:9000/videos
@@ -261,11 +265,11 @@ services:
     ports:
       - "8081:8081"
     environment:
-      ME_CONFIG_MONGODB_URL: mongodb://${MONGODB_USERNAME:-admin}:${MONGODB_PASSWORD:-password}@mongodb:27017/?authSource=admin
-      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGODB_USERNAME:-admin}
-      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGODB_PASSWORD:-password}
-      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USERNAME:-admin}
-      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD:-password}
+      ME_CONFIG_MONGODB_URL: mongodb://admin:password@mongodb:27017/?authSource=admin
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: password
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: password
     depends_on:
       mongodb:
         condition: service_healthy

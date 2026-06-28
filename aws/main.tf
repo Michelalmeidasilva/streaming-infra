@@ -32,10 +32,10 @@ module "ssm_secrets" {
   s3_secret_access_key = module.iam_s3.iam_secret_access_key
 }
 
-# 5. ECR — repositórios de imagem para os 3 serviços container + orquestrador (Plano 2).
+# 5. ECR — repositórios de imagem para os 3 serviços container.
 module "ecr" {
   source           = "./modules/ecr"
-  repository_names = ["vod-ingest", "vod-distribution", "vod-transcode", "vod-benchmark-orchestrator"]
+  repository_names = ["vod-ingest", "vod-distribution", "vod-transcode", "vod-transcode-gpu"]
 }
 
 # 6. Lambda do ingest (Event Gateway).
@@ -121,81 +121,7 @@ output "iam_access_key_id" {
   value = module.iam_s3.iam_access_key_id
 }
 
-# 11. Benchmark harness (Plano 1 — desligado por padrão; ativado pelo orquestrador).
-# GPU usa um repositório ECR separado 'vod-transcode-gpu' (criado no Plano 2 — o módulo ecr ainda não o cria;
-# habilitar tipos GPU exige esse repo).
-module "transcode_benchmark_harness" {
-  count  = var.enable_transcode_benchmark_harness ? 1 : 0
-  source = "./modules/transcode-benchmark-harness"
-
-  benchmark_instance_types = var.benchmark_instance_types
-  benchmark_session_id     = var.benchmark_session_id
-  codecs                   = var.benchmark_codecs
-  resolutions              = var.benchmark_resolutions
-  repeats                  = var.benchmark_repeats
-  mode                     = var.benchmark_mode
-
-  corpus_bucket        = module.storage_s3.bucket_id
-  corpus_prefix        = "benchmark/corpus/"
-  ingest_benchmark_url = module.ingest_lambda.function_url
-
-  vpc_id    = module.network.vpc_id
-  subnet_id = module.network.public_subnet_ids[0]
-
-  ecr_image_cpu = "${module.ecr.repository_urls["vod-transcode"]}:latest"
-  ecr_image_gpu = "${module.ecr.repository_urls["vod-transcode"]}-gpu:latest"
-}
-
-# 12. Benchmark trigger — orquestrador Lambda com IAM escopada + watchdog (Plano 2).
-# Desligado por padrão (count = 0); habilitado quando enable_transcode_benchmark_harness = true.
-# Requer que o módulo transcode_benchmark_harness[0] exista (instância profile para PassRole).
-module "benchmark_trigger" {
-  count  = var.enable_transcode_benchmark_harness ? 1 : 0
-  source = "./modules/benchmark-trigger"
-
-  image_uri                      = "${module.ecr.repository_urls["vod-benchmark-orchestrator"]}:latest"
-  benchmark_instance_profile_arn = module.transcode_benchmark_harness[0].instance_profile_arn
-  benchmark_role_arn             = module.transcode_benchmark_harness[0].instance_role_arn
-  benchmark_subnet_id            = module.network.public_subnet_ids[0]
-  state_bucket                   = "vod-tfstate-prod-use2"
-  corpus_bucket                  = module.storage_s3.bucket_id
-  allowed_instance_types         = var.benchmark_instance_types
-}
-
-# 12b. IAM inline policy: permite que a identidade COMPARTILHADA vod-storage-svc invoque
-# a Function URL do orquestrador de benchmark (lambda:InvokeFunctionUrl) via SigV4/AWS_IAM.
-#
-# IMPORTANTE — identidade compartilhada:
-#   A identidade `vod-storage-svc` (module.iam_s3) é também usada pelo serviço distribution
-#   para acesso ao S3. Quando o benchmark está habilitado, a distribution tecnicamente ganha
-#   esse invoke também. Não há dependência circular: module.iam_s3 não depende de
-#   module.benchmark_trigger.
-#
-# TODO (hardening futuro): criar uma identidade dedicada para o platform-upload separada
-#   da identity de distribuição, de modo que a concessão de invoke fique escopada apenas
-#   ao serviço que realmente precisa disparar o benchmark.
-resource "aws_iam_user_policy" "benchmark_invoke" {
-  count = var.enable_transcode_benchmark_harness ? 1 : 0
-  name  = "vod-benchmark-invoke"
-  user  = module.iam_s3.user_name
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Sid      = "InvokeBenchmarkOrchestrator"
-      Effect   = "Allow"
-      Action   = "lambda:InvokeFunctionUrl"
-      Resource = module.benchmark_trigger[0].function_arn
-      Condition = {
-        StringEquals = {
-          "lambda:FunctionUrlAuthType" = "AWS_IAM"
-        }
-      }
-    }]
-  })
-}
-
-# 13. Observability — CloudWatch dashboard + alarms (Plan 2 Phase A).
+# 11. Observability — CloudWatch dashboard + alarms (Plan 2 Phase A).
 module "observability" {
   source    = "./modules/observability"
   providers = { aws.us_east_1 = aws.us_east_1 }
@@ -211,4 +137,68 @@ module "observability" {
 
 output "observability_dashboard" {
   value = module.observability.dashboard_name
+}
+
+# 12. Cost guard — budgets ($40/mês, $3/dia) → SNS → kill-switch Lambda (soft-stop).
+module "cost_guard" {
+  source    = "./modules/cost-guard"
+  providers = { aws = aws.us_east_1 }
+
+  environment   = var.environment
+  target_region = var.aws_region
+
+  monthly_limit_usd = var.monthly_limit_usd
+  daily_limit_usd   = var.daily_limit_usd
+  alert_email       = var.alert_email
+
+  lambda_function_names = ["streaming-ingest", "streaming-distribution"]
+  event_rule_names = [
+    module.events.s3_to_batch_rule_name,
+    module.events.s3_to_ingest_rule_name,
+  ]
+  batch_job_queue_name = module.transcode_batch.job_queue_name
+  cloudfront_distribution_ids = [
+    module.distribution_lambda.cdn_distribution_id,
+    module.web_client_cdn.cdn_distribution_id,
+  ]
+}
+
+output "cost_guard_killswitch_function" {
+  value = module.cost_guard.killswitch_function_name
+}
+
+# 13. Transcode benchmark harness — self-terminating EC2, corpus-driven.
+# Disabled by default; enable with enable_transcode_benchmark_harness=true.
+# Upload clips to s3://<bucket>/benchmark/corpus/, then apply.
+# The instance runs the benchmark binary over the corpus matrix and self-terminates.
+module "transcode_benchmark_harness" {
+  source = "./modules/transcode-benchmark-harness"
+
+  enabled       = var.enable_transcode_benchmark_harness
+  instance_type = var.benchmark_instance_type
+  ami_arch      = var.benchmark_ami_arch
+  machine_label = var.benchmark_machine_label
+
+  gpu                  = var.benchmark_gpu
+  encoder_backend      = var.benchmark_gpu ? "nvenc" : "software"
+  image_uri            = var.benchmark_gpu ? "${module.ecr.repository_urls["vod-transcode-gpu"]}:${var.benchmark_image_tag}" : "${module.ecr.repository_urls["vod-transcode"]}:${var.benchmark_image_tag}"
+  subnet_id            = module.network.public_subnet_ids[0]
+  security_group_id    = module.network.batch_security_group_id
+  aws_region           = var.aws_region
+  corpus_bucket        = module.storage_s3.bucket_id
+  corpus_prefix        = var.benchmark_corpus_prefix
+  codecs               = var.benchmark_codecs
+  resolutions          = var.benchmark_resolutions
+  repeats              = var.benchmark_repeats
+  ingest_benchmark_url = "${module.ingest_lambda.function_url}api/v1"
+  ssm_parameter_prefix = module.ssm_secrets.parameter_prefix
+  ssm_parameter_arns   = module.ssm_secrets.parameter_arns
+  benchmark_mode       = var.benchmark_mode
+  quality_points       = var.benchmark_quality_points
+  tags                 = { Environment = var.environment }
+}
+
+output "benchmark_instance_id" {
+  value       = module.transcode_benchmark_harness.instance_id
+  description = "EC2 benchmark harness instance ID (null when disabled)."
 }

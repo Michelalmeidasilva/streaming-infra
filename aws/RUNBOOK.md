@@ -3,8 +3,8 @@
 > Como subir o ambiente AWS (us-east-2) dos serviços VOD. O código foi **autorado e
 > validado** (`terraform validate`/`fmt` ✅); este runbook cobre os passos que **tocam a
 > AWS** e que você executa com suas credenciais. Spec e planos completos em
-> `docs/design-docs/plans/2026-06-03-aws-iac-*.md` e
-> `docs/design-docs/specs/2026-06-03-aws-iac-terraform-ansible-design.md`.
+> `docs/superpowers/plans/2026-06-03-aws-iac-*.md` e
+> `docs/superpowers/specs/2026-06-03-aws-iac-terraform-ansible-design.md`.
 
 ---
 
@@ -196,37 +196,17 @@ a URL é preservada.
 
 ---
 
-## Benchmark
-
-### Habilitando o harness de benchmark
-
-Para ativar a frota de benchmark, passe `enable_transcode_benchmark_harness = true` (e um
-`benchmark_instance_types` não-vazio, ex.: `["c5.2xlarge"]`) no `terraform.tfvars` e faça
-`terraform apply`.
-
-### Policy `vod-benchmark-invoke` (lambda:InvokeFunctionUrl)
-
-Quando `enable_transcode_benchmark_harness = true`, o Terraform provisiona automaticamente
-uma policy inline `vod-benchmark-invoke` no usuário `vod-storage-svc` (identidade
-compartilhada `vod-storage-svc` gerenciada pelo módulo `iam-s3`). Essa policy concede
-**exclusivamente** `lambda:InvokeFunctionUrl` na Function URL do orquestrador de benchmark
-(`module.benchmark_trigger[0].function_arn`), condicionado a `lambda:FunctionUrlAuthType =
-"AWS_IAM"` (SigV4 obrigatório — sem invoke anônimo).
-
-**Caveat de identidade compartilhada:** o usuário `vod-storage-svc` também é usado pelo
-serviço `streaming-distribution` para acesso ao S3. Isso significa que, quando o benchmark
-está habilitado, a distribution tecnicamente ganha a capacidade de invocar o orquestrador
-também. Esse escopo excessivo é aceitável no curto prazo.
-
-**TODO (hardening futuro):** criar uma identidade IAM dedicada para o `platform-upload`,
-separada da identidade de distribuição, de modo que a concessão de `lambda:InvokeFunctionUrl`
-fique escopada exclusivamente ao serviço que precisa disparar o benchmark. Registrado como
-`TODO` em `aws/main.tf` no recurso `aws_iam_user_policy.benchmark_invoke`.
-
----
-
 ## Próximo passo documentado (não implementado)
 
 **CI/CD via GitHub Actions + OIDC:** assumir uma IAM Role federada (sem chave AWS no repo),
 rodar `terraform plan` no PR e `apply` no merge; encadear os playbooks Ansible. Bootstrap:
 criar o OIDC provider + Role. Ver `infra/ansible/README.md` e o spec.
+
+## Cost Guard (kill-switch por budget)
+
+Aplicado junto com o `terraform apply` do stack. Após o primeiro apply:
+1. Confirme as 2 subscriptions de e-mail do SNS (link nos e-mails de confirmação).
+2. Verifique os budgets no console (Billing → Budgets): `vod-prod-monthly` ($40),
+   `vod-prod-daily` ($3).
+3. Recuperação após disparo: `DIST_IDS="<ids>" bash aws/scripts/cost-guard-rearm.sh`.
+Detalhes e limitações: `infra/docs/cost-guard.md`.

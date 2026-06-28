@@ -4,3 +4,31 @@ storage_bucket_name = "PREENCHER-com-o-nome-do-bucket-existente"
 mongodb_uri  = "mongodb+srv://user:pass@cluster.mongodb.net/streaming"
 rabbitmq_url = "amqps://user:pass@host.cloudamqp.com/vhost"
 redis_url    = "rediss://user:pass@host:6379"
+
+# --- Origens de browser autorizadas a upload presigned direto no bucket S3 ---
+# Em prod INCLUA o domínio da Vercel, senão o preflight CORS do S3 retorna 403 no PUT.
+# Sem esta chave aplica-se o default (só localhost) de modules/storage-s3/variables.tf.
+cors_allowed_origins = [
+  "https://streaming-platform-upload.vercel.app",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+]
+
+# --- Cost guard (kill-switch por budget) ---
+monthly_limit_usd = 40
+daily_limit_usd   = 3
+alert_email       = "voce@exemplo.com"
+
+# --- Transcode codec benchmark harness (off by default) ---
+# 1) upload clips once to s3://<bucket>/benchmark/corpus/
+# 2) for arm64: make -C ../../streaming-transcode image-push-multiarch
+# 3) enable + pick instance type, apply; the instance runs the matrix and self-terminates.
+enable_transcode_benchmark_harness = false
+benchmark_instance_type            = "c5.xlarge"
+benchmark_ami_arch                 = "x86_64"
+benchmark_image_tag                = "latest"
+benchmark_machine_label            = ""
+benchmark_corpus_prefix            = "benchmark/corpus/"
+benchmark_codecs                   = "h264,h265,av1"
+benchmark_resolutions              = "1280x720:3000,1920x1080:6000"
+benchmark_repeats                  = 3
