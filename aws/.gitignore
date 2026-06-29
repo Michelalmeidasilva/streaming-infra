@@ -5,7 +5,6 @@
 *.tfstate.*
 crash.log
 
-# Secrets — valores reais nunca vão para o git
-terraform.tfvars
+# Secrets — valores sensíveis que nunca vão para o git
 *.auto.tfvars
 backend.hcl
