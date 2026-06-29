@@ -75,9 +75,9 @@ variable "enable_transcode_benchmark_harness" {
 }
 
 variable "benchmark_instance_type" {
-  description = "EC2 instance type for the transcode benchmark run (e.g. c5.xlarge for x86_64, c7g.xlarge for Graviton arm64)."
+  description = "EC2 instance type for the transcode benchmark run. Default g4dn.xlarge (NVIDIA T4 GPU, on-demand, NVENC). Use c5.xlarge for x86_64 CPU, c7g.xlarge for Graviton arm64."
   type        = string
-  default     = "c5.xlarge"
+  default     = "g4dn.xlarge"
 }
 
 variable "benchmark_machine_label" {
@@ -127,9 +127,9 @@ variable "benchmark_repeats" {
 }
 
 variable "benchmark_gpu" {
-  description = "When true, the benchmark harness uses the GPU image (vod-transcode-gpu) with the nvenc encoder backend on an NVIDIA GPU instance."
+  description = "When true, the benchmark harness uses the GPU image (vod-transcode-gpu) with the nvenc encoder backend on an NVIDIA GPU instance. Default true to match the g4dn.xlarge GPU default; set false for CPU runs."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "benchmark_mode" {
