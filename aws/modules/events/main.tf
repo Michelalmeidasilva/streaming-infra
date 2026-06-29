@@ -33,6 +33,7 @@ resource "aws_iam_role_policy" "events_batch" {
 resource "aws_cloudwatch_event_rule" "s3_to_batch" {
   name        = "vod-${var.environment}-s3-to-batch"
   description = "S3 raw/ ObjectCreated -> SubmitJob (transcode)"
+  state       = "ENABLED" # gerenciado pelo TF: evita drift silencioso (regra desligada = sem transcode)
   event_pattern = jsonencode({
     source      = ["aws.s3"]
     detail-type = ["Object Created"]
@@ -107,6 +108,7 @@ resource "aws_iam_role_policy" "events_api" {
 resource "aws_cloudwatch_event_rule" "s3_to_ingest" {
   name        = "vod-${var.environment}-s3-to-ingest"
   description = "S3 raw/ ObjectCreated -> ingest webhook"
+  state       = "ENABLED" # gerenciado pelo TF: evita drift silencioso
   event_pattern = jsonencode({
     source      = ["aws.s3"]
     detail-type = ["Object Created"]
