@@ -1,3 +1,5 @@
 bin/
 .superpowers/
 terraform_*.zip
+.env
+aws/terraform.tfvars
